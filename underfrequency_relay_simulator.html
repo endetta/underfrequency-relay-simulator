@@ -4,16 +4,296 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Simulator Underfrequency Relay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F1F3F0; --surface:#FFFFFF; --ink:#16233A; --ink-soft:#4A5568;
+    --blue:#1F4E8C; --blue-soft:#E7EEF6; --teal:#13697A; --teal-soft:#E0EFF1; --copper:#B5651D; --copper-deep:#8C4E16; --copper-soft:#F5E9DC;
+    --line:#D6DAD2; --red:#C0392B; --red-soft:#F8E4E1; --green:#2E7D46; --green-soft:#E3F1E7;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;font-size:14px;line-height:1.5;}
+  .wrap{max-width:1560px;margin:0 auto;padding:14px 22px 40px;}
+
+  /* ===== layout varian A (PRD §4): params | SLD+transport+grafik | status ===== */
+  .layout{display:grid;grid-template-columns:296px minmax(0,1fr) 336px;gap:16px;align-items:start;
+    grid-template-areas:"params sld side" "params tr side" "params fch side" "params vch side";}
+  .l-p{grid-area:params}.l-sld{grid-area:sld}.l-tr{grid-area:tr}.l-fch{grid-area:fch}.l-vch{grid-area:vch}.l-side{grid-area:side}
+  @media(max-width:1240px){.layout{grid-template-columns:296px minmax(0,1fr);grid-template-areas:"params sld" "params tr" "params fch" "params vch";}
+    .l-side{grid-column:1/-1;}}
+  @media(max-width:900px){.layout{grid-template-columns:1fr;grid-template-areas:"sld" "tr" "fch" "vch" "params" "side";}}
+
+  /* ===== kunci tinggi desktop: kolom kiri & kanan scroll internal ===== */
+  @media (min-width:921px) and (min-height:600px){
+    .l-p{position:sticky;top:0;max-height:100vh;}
+    .l-side{position:sticky;top:0;max-height:100vh;}
+  }
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 15px;margin-bottom:14px;}
+  .card-h{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;margin:0 0 12px;overflow:hidden;}
+  .card-h .dot{width:7px;height:7px;border-radius:50%;background:var(--copper);}
+  .card-h .chev{margin-left:auto;color:var(--ink-soft);font-size:11px;transition:transform .15s;}
+  .card .card-b{display:grid;grid-template-rows:1fr;transition:grid-template-rows .35s ease,opacity .22s ease;}
+  .card .card-b-i{overflow:hidden;min-height:0;}
+  .card.collapsed .card-b{grid-template-rows:0fr;opacity:0;}
+  .card.collapsed .chev{transform:rotate(-90deg);}
+
+  /* scrollbar TIPIS GLOBAL (seam Differential/Distance) */
+  *{scrollbar-width:thin;scrollbar-color:var(--line) transparent;}
+  *::-webkit-scrollbar{width:6px;height:6px;}
+  *::-webkit-scrollbar-track{background:transparent;}
+  *::-webkit-scrollbar-thumb{background:var(--line);border-radius:10px;}
+  *::-webkit-scrollbar-thumb:hover{background:var(--blue-soft);}
+  .params-panel{display:flex;flex-direction:column;gap:14px;overflow-y:auto;scrollbar-gutter:stable;padding:2px 3px 2px 0;transition:padding-top .35s ease;}
+  .params-panel .card{margin-bottom:0;}
+  @media(max-width:900px){.params-panel{height:auto!important;overflow:visible;scrollbar-gutter:auto;}}
+  /* pusat tumpukan saat semua ciut DIATUR via padding-top inline (animatable) —
+     jangan justify-content: tidak animatable → blink tengah→atas (seam anti-blink). */
+
+  .field{margin-bottom:11px;}
+  .field:last-child{margin-bottom:0;}
+  .field label{display:flex;justify-content:space-between;gap:6px;align-items:center;font-size:11.5px;color:var(--ink-soft);margin-bottom:4px;font-family:'JetBrains Mono',monospace;}
+  .field label b{color:var(--ink);font-weight:600;}
+  .field label .qline{display:inline-flex;gap:6px;align-items:center;}
+  .q{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:var(--blue-soft);color:var(--blue);cursor:help;font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:700;line-height:1;flex:none;}
+  .q:hover{background:var(--blue);color:#fff;}
+  .card-h .q{width:13px;height:13px;font-size:9px;}
+  #qTip{position:fixed;z-index:70;max-width:260px;pointer-events:none;background:var(--ink);color:#FDFAF3;
+    border:1px solid rgba(255,255,255,.09);border-radius:9px;padding:8px 11px;font-family:'Inter',sans-serif;
+    font-size:11px;line-height:1.55;box-shadow:0 10px 26px rgba(22,35,58,.32);display:none;}
+  #qTip.show{display:block;animation:qIn .15s cubic-bezier(.2,.7,.35,1);transform-origin:top center;}
+  #qTip::before{content:'';position:absolute;top:-6px;left:16px;border:6px solid transparent;border-bottom-color:var(--ink);pointer-events:none;}
+  @keyframes qIn{from{opacity:0;transform:translateY(-3px) scale(.97);}to{opacity:1;transform:none;}}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+  input[type=number]{width:100%;min-width:0;padding:6px 7px;border:1px solid var(--line);border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink);background:var(--bg);}
+  input[type=range]{width:100%;accent-color:var(--blue);margin:0;min-width:0;}
+  select{width:100%;min-width:0;padding:6px 7px;border:1px solid var(--line);border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink);background:var(--bg);}
+  .btngroup{display:flex;gap:6px;flex-wrap:wrap;}
+  .btngroup button{flex:1 1 auto;min-width:0;padding:7px 6px;border:1px solid var(--line);background:var(--surface);border-radius:7px;font-family:'Inter',sans-serif;font-size:11.5px;font-weight:500;color:var(--ink-soft);cursor:pointer;transition:.15s;}
+  .btngroup button.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .btngroup button:hover:not(.active){border-color:var(--blue);color:var(--blue);}
+  .mini-btn{padding:5px 9px;border:1px solid var(--line);background:var(--surface);border-radius:7px;font-size:11.5px;font-weight:500;color:var(--ink-soft);cursor:pointer;}
+  .mini-btn:hover{border-color:var(--blue);color:var(--blue);}
+  .mini-btn.hl{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600;padding:6px 12px;}
+  .topbar .mini-btn.hl{padding:2px 10px;line-height:1.2;}
+  .mini-btn.hl:hover{background:#16385F;color:#fff;}
+  .mini-btn.on{border-color:var(--blue);background:var(--blue-soft);color:var(--blue);font-weight:600;}
+  .mini-btn.playing{background:var(--red);border-color:var(--red);color:#fff;font-weight:600;}
+  .warn{font-size:10.5px;color:var(--copper);background:var(--copper-soft);border-radius:7px;padding:6px 9px;margin-top:8px;line-height:1.5;font-family:'JetBrains Mono',monospace;}
+
+  .topbar{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .topbar .tt{position:relative;display:inline-flex;align-items:center;font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;letter-spacing:-.01em;margin-right:auto;line-height:1.2;}
+  .topbar .tt-a,.topbar .tt-b{background:linear-gradient(100deg,var(--ink) 20%,#8A6B4D 42%,#FDFAF3 50%,#8A6B4D 58%,var(--ink) 80%);
+    background-size:260% 100%;
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;}
+  .topbar .tt-a{animation:ttShine 6s linear infinite,ttSwapA 24s ease-in-out infinite;}
+  .topbar .tt-b{position:absolute;left:20px;top:50%;transform:translateY(-50%);white-space:nowrap;animation:ttShine 6s linear infinite,ttSwapB 24s ease-in-out infinite;}
+  @keyframes ttShine{0%{background-position:140% 0}100%{background-position:-140% 0}}
+  @keyframes ttSwapA{0%,58%{opacity:1}74%,88%{opacity:0}96%,100%{opacity:1}}
+  @keyframes ttSwapB{0%,58%{opacity:0}74%,88%{opacity:1}96%,100%{opacity:0}}
+  @media (prefers-reduced-motion: reduce){
+    .topbar .tt-a,.topbar .tt-b{animation:none!important;}
+    .topbar .tt-b{display:none;}
+    .params-panel{transition:none!important;}
+  }
+  .topbar .tt::before{content:'';width:9px;height:9px;border-radius:50%;background:var(--copper);box-shadow:0 0 0 3.5px var(--copper-soft);margin-right:11px;flex:none;}
+
+  /* ===== kartu SLD ===== */
+  .sld-card{grid-area:sld;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;}
+  .sld-card .sld-title{font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:600;margin:0 0 8px;display:flex;align-items:center;gap:8px;}
+  .sld-card .sld-title .tag{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:400;color:var(--ink-soft);background:var(--bg);border-radius:999px;padding:2px 9px;}
+  .sld-card svg{display:block;margin:0 auto;max-width:100%;height:auto;}
+  .legend{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--ink-soft);margin-top:8px;font-family:'JetBrains Mono',monospace;}
+  .legend span{display:inline-flex;align-items:center;gap:5px;}
+  .legend i{width:10px;height:10px;border-radius:3px;display:inline-block;flex:none;}
+  .legend i.brkopen{background:var(--surface);border:1.5px solid var(--red);transform:rotate(45deg);border-radius:2px;}
+
+  /* ===== transport kompak (satu baris ramping, tinggi ≤ 40 px) ===== */
+  .transport{grid-area:tr;display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);
+    border-radius:12px;padding:5px 12px;height:40px;min-width:0;}
+  .transport .tb{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--ink-soft);white-space:nowrap;}
+  .transport .tb b{color:var(--ink);font-weight:600;}
+  .transport input[type=range]{flex:1;min-width:60px;}
+  .spd{display:inline-flex;gap:4px;}
+  .spd button{padding:3px 8px;font-size:10.5px;border:1px solid var(--line);background:var(--surface);border-radius:6px;color:var(--ink-soft);cursor:pointer;}
+  .spd button.active{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600;}
+
+  /* ===== kartu grafik (M2) & status (M3) — shell hadir sejak M1 ===== */
+  .chart-card{grid-area:fch;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-height:130px;}
+  .chart-card.v{grid-area:vch;}
+  .chart-card .ph{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-soft);text-align:center;padding:34px 0 8px;}
+  .side-card{grid-area:side;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;min-height:0;}
+  .side-card .tabs{display:flex;gap:6px;margin-bottom:12px;}
+  .side-card .tabs button{flex:1;padding:7px 4px;border:1px solid var(--line);background:var(--surface);border-radius:7px;font-family:'Inter',sans-serif;font-size:11.5px;font-weight:500;color:var(--ink-soft);cursor:pointer;}
+  .side-card .tabs button.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .side-card .ph{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-soft);text-align:center;padding:48px 0;}
+
+  /* ===== splash pembuka (seam Differential/Distance) ===== */
+  #root{position:relative;}
+  #splash{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+    background:
+      radial-gradient(900px 600px at 16% 10%,rgba(181,101,29,.08),transparent 62%),
+      radial-gradient(760px 540px at 86% 92%,rgba(181,101,29,.07),transparent 62%),
+      linear-gradient(135deg,#FDFAF3 0%,#F8EFE1 100%);
+    transform:translateX(-101%);
+    transition:transform .4s cubic-bezier(.25,.6,.25,1);
+    -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 9%,#000 91%,transparent 100%);
+    mask-image:linear-gradient(90deg,transparent 0,#000 9%,#000 91%,transparent 100%);
+    cursor:pointer;
+  }
+  #splash.go{transform:none;}
+  #splash.out{transform:translateX(101%);transition:transform .45s cubic-bezier(.6,0,.85,.35);}
+  #splash .sp-title{font-family:'Space Grotesk',sans-serif;font-weight:700;letter-spacing:-.015em;font-size:clamp(23px,4.4vw,40px);text-align:center;padding:0 18px;opacity:0;
+    background:linear-gradient(100deg,var(--ink) 25%,var(--copper-deep) 95%);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;}
+  #splash.go .sp-title{animation:spUp .34s cubic-bezier(.2,.75,.3,1) .38s both;}
+  #splash .sp-rule{width:62px;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--copper),var(--copper-soft));opacity:0;}
+  #splash.go .sp-rule{animation:spWide .3s ease .5s both;}
+  #splash .sp-letters{display:flex;gap:13px;}
+  #splash .sp-letters span{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:16px;letter-spacing:.18em;color:var(--copper);opacity:0;}
+  #splash.go .sp-letters span:nth-child(1){animation:spL .22s ease .60s both;}
+  #splash.go .sp-letters span:nth-child(2){animation:spL .22s ease .65s both;}
+  #splash.go .sp-letters span:nth-child(3){animation:spL .22s ease .70s both;}
+  #splash.go .sp-letters span:nth-child(4){animation:spL .22s ease .75s both;}
+  #splash.go .sp-letters span:nth-child(5){animation:spL .22s ease .80s both;}
+  @keyframes spUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @keyframes spWide{from{opacity:0;transform:scaleX(.15)}to{opacity:1;transform:scaleX(1)}}
+  @keyframes spL{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+  @keyframes spMain{from{opacity:0;transform:translateY(10px) scale(.995)}to{opacity:1;transform:none}}
+  .wrap{opacity:0;}
+  #root.ready .wrap{animation:spMain .55s cubic-bezier(.22,.75,.28,1) both;}
+  @media (prefers-reduced-motion: reduce){
+    #splash{display:none;}
+    #root.ready .wrap{opacity:1;animation:none;}
+  }
+</style>
+<noscript><style>.wrap{opacity:1!important;}</style></noscript>
 </head>
 <body>
-<!-- UI menyusul (M1+): SLD, grafik, kartu, transport. M0 = mesin perhitungan. -->
-<div id="app"></div>
+<div id="root">
+
+  <div id="splash" aria-hidden="true">
+    <div class="sp-title">Simulator Underfrequency Relay</div>
+    <div class="sp-rule"></div>
+    <div class="sp-letters"><span>S</span><span>H</span><span>E</span><span>V</span><span>A</span></div>
+  </div>
+
+<div class="wrap">
+
+  <div class="topbar">
+    <span class="tt"><span class="tt-a">Simulator Underfrequency Relay</span><span class="tt-b">by Sheva - Endetta</span></span>
+    <button class="mini-btn hl" id="collapseAll">Ciutkan semua</button>
+    <button class="mini-btn hl" id="expandAll">Buka semua</button>
+  </div>
+
+  <div class="layout">
+
+    <!-- ===== KIRI: parameter ===== -->
+    <div class="l-p">
+      <div class="params-panel" id="paramsPanel">
+
+        <div class="card" data-card="unit">
+          <div class="card-h"><span class="dot"></span>Unit pembangkit<span class="chev">▾</span></div>
+          <div class="card-b"><div class="card-b-i">
+            <div class="field">
+              <label><span>Preset sistem</span><span class="qline"><span class="q" data-tip="Dua konfigurasi awal: mandiri (beban 1100 MW = pembangkitan) atau berimpor (beban 1500 MW, 400 MW dari interkoneksi).">?</span></span></label>
+              <select id="presetSel">
+                <option value="mandiri">Sistem mandiri — 1100 MW</option>
+                <option value="berimpor">Dengan impor 400 MW — 1500 MW</option>
+              </select>
+            </div>
+            <div class="field">
+              <label><span>Impor dari interkoneksi</span><b id="impV">400 MW</b></label>
+              <input type="range" id="impSlider" min="0" max="400" step="50" value="400">
+            </div>
+            <div id="genList"></div>
+          </div></div>
+        </div>
+
+        <div class="card" data-card="beban">
+          <div class="card-h"><span class="dot"></span>Beban &amp; tahap UFLS<span class="chev">▾</span></div>
+          <div class="card-b"><div class="card-b-i">
+            <div class="field"><label>Beban dasar <b id="loadV">1100 MW</b></label></div>
+            <div id="stageList"></div>
+            <div class="warn">Ambang &amp; porsi lepas = praktik tipikal global; belum diverifikasi ke pedoman resmi PLN.</div>
+          </div></div>
+        </div>
+
+        <div class="card" data-card="skenario">
+          <div class="card-h"><span class="dot"></span>Skenario peristiwa<span class="chev">▾</span></div>
+          <div class="card-b"><div class="card-b-i">
+            <div class="btngroup" id="scenGroup"></div>
+            <div class="warn" style="margin-top:9px">Peristiwa dipicu di t = 1,0 s setelah <b>▶</b>.</div>
+          </div></div>
+        </div>
+
+        <div class="card" data-card="tentang">
+          <div class="card-h"><span class="dot"></span>Tentang<span class="chev">▾</span></div>
+          <div class="card-b"><div class="card-b-i">
+            <div style="font-size:11.5px;color:var(--ink-soft);line-height:1.65">
+              Simulator edukasi relay <b>underfrequency (ANSI 81U)</b> + pelepasan beban bertahap (UFLS)
+              satu-area koheren. Model numerik deterministik (integrasi segmen bentuk-tertutup);
+              kurva tegangan bersifat <b>ilustratif</b>, bukan hasil aliran daya.
+              Referensi: PRD §5, spesifikasi U01, praktik tipikal UFLS (ambang berlabel PLN).
+            </div>
+          </div></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ===== TENGAH: SLD + transport + grafik ===== -->
+    <div class="sld-card" id="sldCard">
+      <div class="sld-title"><span class="dot"></span>Diagram satu garis (SLD)<span class="tag" id="sldTag">SEIMBANG · 50.00 Hz</span></div>
+      <svg id="sld" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 248" role="img" aria-label="Diagram satu garis sistem satu area"></svg>
+      <div class="legend" id="legend">
+        <span><i style="background:var(--green)"></i>ONLINE</span>
+        <span><i style="background:var(--red)"></i>TRIP / terbuka</span>
+        <span><i style="background:var(--copper)"></i>batas governor</span>
+        <span><i style="background:var(--teal)"></i>beban vital</span>
+        <span><i class="brkopen"></i>pemutus terbuka</span>
+      </div>
+    </div>
+
+    <div class="transport" id="transport">
+      <button class="mini-btn hl" id="playBtn" title="Jalankan / jeda">▶</button>
+      <span class="spd" id="spdGroup">
+        <button data-spd="0.5">0,5×</button>
+        <button data-spd="1" class="active">1×</button>
+        <button data-spd="2">2×</button>
+      </span>
+      <input type="range" id="scrub" min="0" max="20" step="0.01" value="0" title="Geser waktu">
+      <span class="tb">t = <b id="tNow">0.00</b> s</span>
+      <button class="mini-btn" id="resetBtn">Reset</button>
+    </div>
+
+    <div class="chart-card"><div class="ph" id="fchPh">Grafik frekuensi f(t) — M2</div></div>
+    <div class="chart-card v"><div class="ph" id="vchPh">Grafik tegangan V(t) (ilustratif) — M2</div></div>
+
+    <!-- ===== KANAN: kartu status 2 tab (isi penuh M3) ===== -->
+    <div class="side-card" id="sideCard">
+      <div class="tabs">
+        <button id="tabKondisi" class="active">Kondisi sistem</button>
+        <button id="tabUrutan">Urutan pelepasan</button>
+      </div>
+      <div class="ph" id="sidePh">Kartu status aktif di M3.</div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<div id="qTip"></div>
+
 <script>
 'use strict';
 /* ═══════════════════════════════════════════════════════════════════════
-   SIMULATOR UNDERFREQUENCY RELAY (ANSI 81U) — M0: mesin perhitungan
+   SIMULATOR UNDERFREQUENCY RELAY (ANSI 81U)
    Rantai model: docs/PRD.md §5; detail integrasi: spesifikasi U01 §7–§8.
-   Semua fungsi di bawah MURNI (tanpa DOM); diuji via tools/*.test.js.
+   Bagian 1–11: mesin perhitungan MURNI (tanpa DOM) — diuji tools/*.test.js.
+   Bagian 12+: state S, renderer murni, binding kontrol, splash.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* ── 1. Helper ── */
@@ -45,7 +325,7 @@ var SCENARIOS = [
   { id: 'runtuh',   label: '+ Beban besar (runtuh)',               kind: 'collapse', mw: 1000 }
 ];
 
-/* MW nyata feeder per tahap = pct × beban pra-gangguan (PRD §3, kejujuran feeder). */
+/* MW nyata feeder per tahap = fraksi × beban dasar (PRD §3, kejujuran feeder). */
 function ufFeederMw(stages, baseLoad) {
   var m = {};
   stages.forEach(function (s) { m[s.id] = Math.round((s.pct || 0) * baseLoad); });
@@ -285,12 +565,11 @@ function ufTimeline(P) {
     f = s.K > 1e-12 ? s.fss + (f - s.fss) * Math.exp(-s.K * dt) : f + dslope(s) * dt;
     t += dt;
     if (f < 47.0) { f = 47.0; }
-    var tripped = false;
     stages.forEach(function (st) {
       if (st.latched) return;
       if (f < st.thr && !nearlyEqual(f, st.thr)) st.timer += dt; else st.timer = 0;
       if (st.timer >= st.delay) {
-        st.latched = true; st.timer = 0; tripped = true;
+        st.latched = true; st.timer = 0;
         var mw = sheds[st.id] !== undefined ? sheds[st.id] : Math.round(baseLoad * st.pct);
         var before = load; load -= mw;
         ev.push({ t: t, kind: 'trip', stage: st.id, mw: mw, fAt: f });
@@ -327,9 +606,398 @@ function ufTimeline(P) {
   };
 }
 
-/* ── 11. Registry ekspor (satu-sumber-kebenaran utk tes; harness menambah __pub) ── */
+/* ═══════════════ 12. State & konfigurasi UI ═══════════════ */
+function clone(x) { return JSON.parse(JSON.stringify(x)); }
+var S = {
+  param: {
+    presetId: 'mandiri',
+    gens: clone(DEFAULT_GENS),
+    loadMw: 1100, importMw: 0,
+    stages: clone(DEFAULT_STAGES),
+    scenario: { kind: 'none' }
+  },
+  ui: {
+    collapsed: { unit: false, beban: false, skenario: false, tentang: false },
+    sideTab: 'kondisi',
+    playing: false, speed: 1, tNow: 0
+  },
+  run: null
+};
+
+function paramP() { // P untuk mesin murni (skenario + fNom/tMax/tEvent)
+  return {
+    fNom: 50, tMax: 20, tEvent: 1.0,
+    gens: clone(S.param.gens), loadMw: S.param.loadMw, importMw: S.param.importMw,
+    stages: clone(S.param.stages), scenario: clone(S.param.scenario)
+  };
+}
+function computeRun() { S.run = ufTimeline(paramP()); if (S.ui.tNow > S.run.tMax) S.ui.tNow = 0; }
+
+/* ═══════════════ 13. Renderer SLD (murni, diuji tools/sld.test.js) ═══════════════
+   Kelas kunci utk tes: .bus (bar), .xc (garis silang generator), .gen (lingkaran),
+   .chip (chip RPM/MW), .brk (pemutus; data-open=1 saat terbuka/rotasi 45°),
+   .openlab (label TERBUKA), .imp (jalur interkoneksi), .vital (feeder vital),
+   .lg (item legenda). TIDAK boleh ada stroke-dasharray di jalur daya. */
+function renderSld(p, t, run) {
+  var gens = p.gens, stages = p.stages;
+  var scn = p.scenario || { kind: 'none' };
+  var offline = {}, impLost = false, loadExtra = 0;
+  if (scn.kind === 'genLoss') offline[scn.target] = true;
+  else if (scn.kind === 'importLoss') impLost = true;
+  else if (scn.kind === 'loadStep') loadExtra = scn.mw || 0;
+  else if (scn.kind === 'collapse') { impLost = true; loadExtra = scn.mw || 1000; }
+  var f = 50, trips = [];
+  if (run) {
+    f = fAt(run, t);
+    trips = run.tripSeq.filter(function (x) { return x.t <= t + 1e-9; });
+  }
+  var open = {}; trips.forEach(function (x) { open[x.stage] = x; });
+  var shedTotal = trips.reduce(function (a, x) { return a + x.mw; }, 0);
+  var loadNow = p.loadMw + loadExtra - shedTotal;
+  var gov = ufGovernorAt(gens, f);
+  var out = [];
+
+  /* ── bus ── */
+  out.push('<line class="bus" x1="150" y1="120" x2="860" y2="120" stroke="#16233A" stroke-width="6" stroke-linecap="round"/>');
+  out.push('<text x="856" y="110" text-anchor="end" font-size="11" font-family="JetBrains Mono,monospace" fill="#4A5568">Beban '
+    + loadNow + ' MW' + (shedTotal ? ' · lepas ' + shedTotal : '') + '</text>');
+
+  /* ── interkoneksi (kiri-atas) ── */
+  var impMw = impLost ? 0 : p.importMw;
+  var impTxt = impLost ? '0 MW · LEPAS' : impMw + ' MW';
+  var impCol = impLost ? '#C0392B' : '#1F4E8C';
+  var impBg  = impLost ? '#F8E4E1' : '#E7EEF6';
+  out.push('<rect class="imp" x="30" y="66" width="100" height="30" rx="7" fill="' + impBg + '" stroke="' + impCol + '"/>');
+  out.push('<text x="80" y="79" text-anchor="middle" font-size="8.5" font-family="JetBrains Mono,monospace" letter-spacing=".08em" fill="#4A5568">INTERKONEKSI</text>');
+  out.push('<text x="80" y="91" text-anchor="middle" font-size="10.5" font-weight="600" font-family="JetBrains Mono,monospace" fill="' + impCol + '">' + impTxt + '</text>');
+  out.push('<line class="imp" x1="80" y1="96" x2="80" y2="112" stroke="#16233A" stroke-width="3"/>');
+  out.push('<rect class="brk" data-open="' + (impLost ? 1 : 0) + '" x="76" y="112" width="8" height="8" fill="' + (impLost ? '#F8E4E1' : '#FFFFFF') + '" stroke="' + (impLost ? '#C0392B' : '#16233A') + '" stroke-width="1.5"'
+    + (impLost ? ' transform="rotate(45 80 116)"' : '') + '/>');
+  if (impLost) out.push('<text class="openlab" x="80" y="107" text-anchor="middle" font-size="7.5" font-family="JetBrains Mono,monospace" fill="#C0392B" paint-order="stroke" stroke="#FFFFFF" stroke-width="3">TERBUKA</text>');
+  // sambungan bus
+  out.push('<line class="imp" x1="80" y1="120" x2="150" y2="120" stroke="#16233A" stroke-width="4"/>');
+
+  /* ── generator (bawah bus): lingkaran + salib (×) + chip RPM/MW ── */
+  var gx = [250, 470, 690];
+  gens.forEach(function (g, i) {
+    var x = gx[i];
+    var isOff = offline[g.id] === true;
+    out.push('<line x1="' + x + '" y1="120" x2="' + x + '" y2="144" stroke="#16233A" stroke-width="3"/>');
+    out.push('<circle class="gen" cx="' + x + '" cy="160" r="16" fill="#FFFFFF" stroke="' + (isOff ? '#C9CDD2' : '#16233A') + '" stroke-width="2"/>');
+    // salib × (simbol generator standar)
+    out.push('<line class="xc" x1="' + (x - 11) + '" y1="149" x2="' + (x + 11) + '" y2="171" stroke="' + (isOff ? '#C9CDD2' : '#16233A') + '" stroke-width="2"/>');
+    out.push('<line class="xc" x1="' + (x - 11) + '" y1="171" x2="' + (x + 11) + '" y2="149" stroke="' + (isOff ? '#C9CDD2' : '#16233A') + '" stroke-width="2"/>');
+    out.push('<text x="' + x + '" y="186" text-anchor="middle" font-size="10" font-family="Space Grotesk,sans-serif" font-weight="600" fill="#16233A">' + g.id + '</text>');
+    // chip: status + RPM + MW
+    var rpm = isOff ? 0 : Math.round(120 * f / g.poles); // n = 120·f/P (P = kutub)
+    var mw = isOff ? 0 : g.p0 + gov.resp[g.id];
+    var sat = !isOff && g.govMax > g.p0 && gov.resp[g.id] >= g.govMax - g.p0 - 1e-9 && f < 50;
+    var chipBg = isOff ? '#EEF0F2' : (sat ? '#F5E9DC' : '#E3F1E7');
+    var chipBd = isOff ? '#C9CDD2' : (sat ? '#B5651D' : '#2E7D46');
+    out.push('<rect class="chip" cx-chip="' + x + '" x="' + (x - 58) + '" y="194" width="116" height="38" rx="7" fill="' + chipBg + '" stroke="' + chipBd + '"/>');
+    out.push('<text x="' + x + '" y="209" text-anchor="middle" font-size="11" font-weight="600" font-family="JetBrains Mono,monospace" fill="#16233A">' + (isOff ? 'TRIP' : 'RPM ' + rpm) + '</text>');
+    out.push('<text class="chipmw" x="' + x + '" y="224" text-anchor="middle" font-size="9.5" font-family="JetBrains Mono,monospace" fill="' + (isOff ? '#C9CDD2' : (sat ? '#8C4E16' : '#2E7D46')) + '">'
+      + (isOff ? '0 MW' : (sat ? Math.round(mw) + ' MW · maks gov' : Math.round(mw) + ' MW')) + '</text>');
+  });
+
+  /* ── feeder beban (atas bus): T1–T4 hijau + VITAL teal, garis solid ── */
+  var fx = [190, 330, 470, 610, 750];
+  var fed = stages.map(function (s) { return { id: s.id, mw: Math.round((s.pct || 0) * p.loadMw) }; });
+  fed.push({ id: 'V', mw: Math.round(p.loadMw * 0.5), vital: true });
+  fed.forEach(function (fd, i) {
+    var x = fx[i];
+    var isOpen = open[fd.id] !== undefined;
+    var col = fd.vital ? '#13697A' : '#2E7D46';
+    var bg  = fd.vital ? '#E0EFF1' : '#E3F1E7';
+    var txt = fd.vital ? 'VITAL · ' + fd.mw + ' MW' : fd.id + ' · ' + fd.mw + ' MW';
+    out.push('<line x1="' + x + '" y1="120" x2="' + x + '" y2="82" stroke="' + col + '" stroke-width="3"/>');
+    out.push('<rect class="brk" data-open="' + (isOpen ? 1 : 0) + '" x="' + (x - 4) + '" y="74" width="8" height="8" fill="' + (isOpen ? '#F8E4E1' : '#FFFFFF') + '" stroke="' + (isOpen ? '#C0392B' : '#16233A') + '" stroke-width="1.5"'
+      + (isOpen ? ' transform="rotate(45 ' + x + ' 78)"' : '') + '/>');
+    out.push('<line x1="' + x + '" y1="74" x2="' + x + '" y2="46" stroke="' + col + '" stroke-width="3"/>');
+    if (isOpen) out.push('<text class="openlab" x="' + x + '" y="68" text-anchor="middle" font-size="7.5" font-family="JetBrains Mono,monospace" fill="#C0392B" paint-order="stroke" stroke="#FFFFFF" stroke-width="3">TERBUKA</text>');
+    // panah aliran saat tertutup
+    if (!isOpen) {
+      out.push('<path class="flow" d="M ' + (x - 4) + ' 96 l 8 0 l -4 -7 z" fill="' + col + '"/>');
+      out.push('<path class="flow" d="M ' + (x - 4) + ' 106 l 8 0 l -4 -7 z" fill="' + col + '"/>');
+    }
+    out.push('<rect x="' + (x - 52) + '" y="18" width="104" height="28" rx="7" fill="' + bg + '" stroke="' + col + '"/>');
+    out.push('<text x="' + x + '" y="36" text-anchor="middle" font-size="9.5" font-family="JetBrains Mono,monospace" font-weight="600" fill="' + (fd.vital ? '#13697A' : '#2E7D46') + '">' + txt + '</text>');
+  });
+
+  return out.join('\n');
+}
+
+/* nilai f pada waktu t (interpolasi linear antar sampel run) */
+function fAt(run, t) {
+  var ts = run.ts, fs = run.fs;
+  if (t <= ts[0]) return fs[0];
+  if (t >= ts[ts.length - 1]) return fs[fs.length - 1];
+  for (var i = 1; i < ts.length; i++) {
+    if (t <= ts[i]) {
+      var a = ts[i - 1], b = ts[i];
+      return fs[i - 1] + (fs[i] - fs[i - 1]) * (t - a) / (b - a);
+    }
+  }
+  return fs[fs.length - 1];
+}
+
+/* ═══════════════ 14. Renderer transport & kartu ═══════════════ */
+function renderTransport() {
+  var r = S.run;
+  var max = r ? Math.max(1, r.tMax) : 20;
+  var p = document.getElementById('scrub');
+  if (p) { p.max = String(max); p.value = String(S.ui.tNow); }
+  var pb = document.getElementById('playBtn');
+  if (pb) { pb.textContent = S.ui.playing ? '❚❚' : '▶'; pb.className = 'mini-btn hl' + (S.ui.playing ? ' playing' : ''); }
+  var tEl = document.getElementById('tNow');
+  if (tEl) tEl.textContent = S.ui.tNow.toFixed(2);
+  return true;
+}
+function renderGenList() {
+  var el = document.getElementById('genList');
+  if (!el) return;
+  var h = '';
+  S.param.gens.forEach(function (g) {
+    h += '<div class="field"><label><span>' + g.id + ' — ' + g.label.split('— ')[1] + '</span>'
+      + '<b>' + g.p0 + ' MW</b></label>'
+      + '<div style="font-family:JetBrains Mono,monospace;font-size:10.5px;color:var(--ink-soft)">H ' + g.h.toFixed(1) + ' s · droop ' + Math.round(g.r * 100) + '% · kutub ' + g.poles
+      + ' · maks gov ' + g.govMax + ' MW</div></div>';
+  });
+  el.innerHTML = h;
+}
+function renderStageList() {
+  var el = document.getElementById('stageList');
+  if (!el) return;
+  var h = '';
+  S.param.stages.forEach(function (s) {
+    var mw = Math.round((s.pct || 0) * S.param.loadMw);
+    h += '<div class="field"><label><span>' + s.id + ' — ambang <b>' + s.thr.toFixed(2) + ' Hz</b></span>'
+      + '<b>' + Math.round(s.pct * 100) + '% · ' + mw + ' MW</b></label>'
+      + '<div style="font-family:JetBrains Mono,monospace;font-size:10.5px;color:var(--ink-soft)">tunda ' + s.delay.toFixed(2) + ' s · latch</div></div>';
+  });
+  el.innerHTML = h;
+}
+function renderScenGroup() {
+  var el = document.getElementById('scenGroup');
+  if (!el) return;
+  var h = '';
+  SCENARIOS.forEach(function (sc) {
+    var active = S.param.scenario.kind === sc.kind && JSON.stringify(S.param.scenario) === JSON.stringify(sc);
+    h += '<button class="scen' + (active ? ' active' : '') + '" data-scen="' + sc.id + '">' + sc.label + '</button>';
+  });
+  el.innerHTML = h;
+}
+
+/* ═══════════════ 15. render() master ═══════════════ */
+function renderSldInto() {
+  var el = document.getElementById('sld');
+  if (!el) return;
+  var p = paramP();
+  var t = S.ui.tNow;
+  el.innerHTML = renderSld(p, t, S.run);
+  var tag = document.getElementById('sldTag');
+  if (tag && S.run) {
+    var f = fAt(S.run, t);
+    var trips = S.run.tripSeq.filter(function (x) { return x.t <= t + 1e-9; }).length;
+    var collapse = false;
+    if (S.run.collapse) { // RUNTUH mulai saat f menempel lantai 47 Hz
+      for (var i = 0; i < S.run.fs.length; i++) {
+        if (S.run.fs[i] <= 47.0001) { collapse = t >= S.run.ts[i] - 1e-9; break; }
+      }
+    }
+    tag.textContent = ufStatus(f, { trips: trips, collapse: collapse }) + ' · ' + f.toFixed(2) + ' Hz';
+  }
+}
+function render() {
+  renderTransport();
+  renderGenList();
+  renderStageList();
+  renderScenGroup();
+  renderSldInto();
+}
+
+/* ═══════════════ 16. Binding kontrol ═══════════════ */
+function el(id) { return document.getElementById(id); }
+function bind() {
+  // collapse kartu kiri
+  var cards = document.querySelectorAll('.card[data-card]');
+  for (var i = 0; i < cards.length; i++) {
+    cards[i].querySelector('.card-h').addEventListener('click', (function (c) {
+      return function () { toggleCard(c.dataset.card); };
+    })(cards[i]));
+  }
+  if (el('collapseAll')) el('collapseAll').addEventListener('click', function () { setAllCollapsed(true); });
+  if (el('expandAll')) el('expandAll').addEventListener('click', function () { setAllCollapsed(false); });
+  if (el('playBtn')) el('playBtn').addEventListener('click', togglePlay);
+  if (el('scrub')) el('scrub').addEventListener('input', function (e) {
+    S.ui.playing = false; S.ui.tNow = parseFloat(e.target.value) || 0; renderSldInto(); renderTransport();
+  });
+  if (el('resetBtn')) el('resetBtn').addEventListener('click', function () {
+    S.ui.playing = false; S.ui.tNow = 0; computeRun(); render();
+  });
+  var spds = document.querySelectorAll('#spdGroup button');
+  for (var j = 0; j < spds.length; j++) {
+    spds[j].addEventListener('click', (function (b) {
+      return function () {
+        S.ui.speed = parseFloat(b.dataset.spd);
+        var all = document.querySelectorAll('#spdGroup button');
+        for (var k = 0; k < all.length; k++) all[k].className = all[k] === b ? 'active' : '';
+        renderTransport();
+      };
+    })(spds[j]));
+  }
+  // delegasi di kontainer (renderScenGroup membangun ulang tombol → listener di tombol hilang)
+  var sg = el('scenGroup');
+  if (sg) sg.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest ? e.target.closest('button.scen') : null;
+    if (!b) return;
+    var sc = null;
+    SCENARIOS.forEach(function (x) { if (x.id === b.dataset.scen) sc = x; });
+    S.param.scenario = clone(sc || { kind: 'none' });
+    S.ui.playing = false; S.ui.tNow = 0; computeRun(); render();
+  });
+  if (el('presetSel')) el('presetSel').addEventListener('change', function (e) {
+    var pr = PRESETS[e.target.value] || PRESETS.mandiri;
+    S.param.presetId = e.target.value;
+    S.param.gens = clone(pr.gens);
+    S.param.loadMw = pr.loadMw;
+    S.param.importMw = pr.importMw;
+    S.ui.playing = false; S.ui.tNow = 0; computeRun(); render();
+  });
+  if (el('impSlider')) el('impSlider').addEventListener('input', function (e) {
+    S.param.importMw = parseFloat(e.target.value) || 0;
+    S.ui.playing = false; S.ui.tNow = 0; computeRun(); render();
+  });
+  if (el('tabKondisi')) el('tabKondisi').addEventListener('click', function () { setSideTab('kondisi'); });
+  if (el('tabUrutan')) el('tabUrutan').addEventListener('click', function () { setSideTab('urutan'); });
+  // tooltip ikon "?"
+  document.addEventListener('pointerover', qTipHover);
+  document.addEventListener('pointerout', qTipOut);
+}
+
+/* ── tooltip #qTip (delegasi .q[data-tip]) ── */
+function qTipHover(e) {
+  var q = e.target.closest ? e.target.closest('.q[data-tip]') : null;
+  if (!q) return;
+  var tip = el('qTip');
+  if (!tip) return;
+  tip.innerHTML = q.dataset.tip;
+  tip.className = 'show';
+  var r = q.getBoundingClientRect();
+  var vw = window.innerWidth || 1440;
+  var tw = 260;
+  var left = Math.min(Math.max(10, r.left - tw / 2 + r.width / 2), vw - tw - 10);
+  tip.style.left = left + 'px';
+  tip.style.top = (r.bottom + 10) + 'px';
+}
+function qTipOut(e) {
+  var q = e.target.closest ? e.target.closest('.q[data-tip]') : null;
+  if (!q) return;
+  var tip = el('qTip');
+  if (tip) tip.className = '';
+}
+
+/* ── collapse (seam anti-blink: centering via padding-top, bukan justify-content) ── */
+var CARD_ORDER = ['unit', 'beban', 'skenario', 'tentang'];
+function toggleCard(name) {
+  S.ui.collapsed[name] = !S.ui.collapsed[name];
+  syncCollapseDom(); syncCollapsedCentering();
+}
+function setAllCollapsed(v) {
+  CARD_ORDER.forEach(function (n) { S.ui.collapsed[n] = v; });
+  syncCollapseDom(); syncCollapsedCentering();
+}
+function syncCollapseDom() {
+  var cards = document.querySelectorAll('.card[data-card]');
+  for (var i = 0; i < cards.length; i++) {
+    cards[i].classList.toggle('collapsed', !!S.ui.collapsed[cards[i].dataset.card]);
+  }
+}
+function collapsedStackH() {
+  var cards = document.querySelectorAll('.card[data-card]');
+  var sum = 0;
+  for (var i = 0; i < cards.length; i++) {
+    var hEl = cards[i].querySelector('.card-h');
+    var h = hEl && hEl.getBoundingClientRect ? hEl.getBoundingClientRect().height : 0;
+    if (!(h > 0)) h = 34;
+    sum += h;
+  }
+  return sum;
+}
+function syncCollapsedCentering() {
+  var panel = el('paramsPanel');
+  if (!panel) return;
+  var all = CARD_ORDER.every(function (n) { return S.ui.collapsed[n]; });
+  panel.classList.toggle('all-collapsed', all);
+  if (all) {
+    var ph = panel.getBoundingClientRect ? panel.getBoundingClientRect().height : 0;
+    var pad = Math.max(0, (ph - collapsedStackH()) / 2 - 16);
+    panel.style.paddingTop = pad + 'px';
+  } else {
+    panel.style.paddingTop = '';
+  }
+}
+
+/* ── tab kartu kanan (isi penuh M3) ── */
+function setSideTab(tab) {
+  S.ui.sideTab = tab;
+  var a = el('tabKondisi'), b = el('tabUrutan');
+  if (a) a.className = tab === 'kondisi' ? 'active' : '';
+  if (b) b.className = tab === 'urutan' ? 'active' : '';
+}
+
+/* ── main loop playback (rAF; 1 langkah = 0.05 s eng @1×) ── */
+function togglePlay() {
+  if (!S.run) computeRun();
+  if (S.run && S.ui.tNow >= S.run.tMax - 1e-9) S.ui.tNow = 0;
+  S.ui.playing = !S.ui.playing;
+  if (S.ui.playing) requestAnimationFrame(tick);
+  renderTransport();
+}
+function tick() {
+  if (!S.ui.playing) return;
+  var step = 0.05 * S.ui.speed;
+  S.ui.tNow += step;
+  var r = S.run;
+  if (r && S.ui.tNow >= r.tMax) { S.ui.tNow = r.tMax; S.ui.playing = false; }
+  renderSldInto();
+  renderTransport();
+  if (S.ui.playing) requestAnimationFrame(tick);
+}
+
+/* ── splash + fit SLD ── */
+(function splash() {
+  var sp = el('splash');
+  if (!sp) return;
+  setTimeout(function () { sp.classList.add('go'); }, 120);
+  sp.addEventListener('click', function () {
+    if (sp.classList.contains('out')) return;
+    sp.classList.remove('go'); sp.classList.add('out');
+    var rt = el('root'); if (rt) rt.classList.add('ready');
+  });
+})();
+function fitSld() {
+  var card = el('sldCard'), svg = el('sld');
+  if (!card || !svg) return;
+  var w = card.getBoundingClientRect().width - 28;
+  if (!(w > 100)) w = 900;
+  svg.setAttribute('width', w);
+  svg.setAttribute('height', w * 248 / 940);
+}
+if (typeof ResizeObserver !== 'undefined') {
+  var ro = new ResizeObserver(function () { fitSld(); });
+  var cardEl = document.getElementById('sldCard');
+  if (cardEl) ro.observe(cardEl);
+}
+setTimeout(fitSld, 350);
+
+/* ═══════════════ 17. Registry ekspor (satu-sumber-kebenaran utk tes) ═══════════════ */
 var API = {
-  render: function () {},                 // UI menyusul (M1+)
+  render: render,
+  renderSld: renderSld,
+  renderSldInto: renderSldInto,
+  renderTransport: renderTransport,
+  fAt: fAt,
   nearlyEqual: nearlyEqual,
   ufAggregates: ufAggregates,
   satDevOf: satDevOf,
@@ -345,8 +1013,28 @@ var API = {
   DEFAULT_GENS: DEFAULT_GENS,
   DEFAULT_STAGES: DEFAULT_STAGES,
   PRESETS: PRESETS,
-  SCENARIOS: SCENARIOS
+  SCENARIOS: SCENARIOS,
+  S: S,
+  paramP: paramP,
+  computeRun: computeRun,
+  toggleCard: toggleCard,
+  setAllCollapsed: setAllCollapsed,
+  syncCollapsedCentering: syncCollapsedCentering,
+  collapsedStackH: collapsedStackH,
+  setSideTab: setSideTab,
+  qTipHover: qTipHover,
+  qTipOut: qTipOut
 };
+
+/* inisialisasi */
+computeRun();
+bind();
+syncCollapseDom();
+render();
+if (typeof document !== 'undefined' && document.getElementById && document.getElementById('root')) {
+  var rt0 = document.getElementById('root');
+  if (rt0 && !rt0.classList.contains('ready')) rt0.classList.add('ready');
+}
 </script>
 </body>
 </html>
