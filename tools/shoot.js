@@ -252,6 +252,8 @@ function setScen(id, tNow, preset) {
     if (btn) btn.click();
     S.ui.tNow = ${tNow};
     API.renderSldInto();
+    API.renderCharts();
+    API.renderSideInto();
     API.renderTransport();
   })()`;
 }

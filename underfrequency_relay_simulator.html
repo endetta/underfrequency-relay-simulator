@@ -1062,7 +1062,8 @@ function bind() {
   if (el('expandAll')) el('expandAll').addEventListener('click', function () { setAllCollapsed(false); });
   if (el('playBtn')) el('playBtn').addEventListener('click', togglePlay);
   if (el('scrub')) el('scrub').addEventListener('input', function (e) {
-    S.ui.playing = false; S.ui.tNow = parseFloat(e.target.value) || 0; renderSldInto(); renderTransport();
+    S.ui.playing = false; S.ui.tNow = parseFloat(e.target.value) || 0;
+    renderSldInto(); renderCharts(); renderSideInto(); renderTransport();
   });
   if (el('resetBtn')) el('resetBtn').addEventListener('click', function () {
     S.ui.playing = false; S.ui.tNow = 0; computeRun(); render();
