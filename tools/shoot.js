@@ -116,7 +116,8 @@ async function capture(cdp, name, setupExpr) {
       rects: {
         colP: rect('.l-p'), sld: rect('.sld-card'), tr: rect('.transport'),
         fch: rect('.chart-card'), vch: rect('.chart-card.v'), side: rect('.side-card'),
-        sldsvg: rect('#sld'), scrub: rect('#scrub'), play: rect('#playBtn')
+        sldsvg: rect('#sld'), scrub: rect('#scrub'), play: rect('#playBtn'),
+        fSvg: rect('#fSvg'), gauge: rect('#gauge'), gSvg: rect('#gauge svg'), vSvg: rect('#vSvg')
       },
       transport: (() => { const t = document.querySelector('.transport'); if (!t) return null;
         const cs = getComputedStyle(t); return { h: Math.round(t.getBoundingClientRect().height), disp: cs.display }; })(),
