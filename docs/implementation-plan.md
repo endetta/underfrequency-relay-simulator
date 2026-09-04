@@ -1,6 +1,8 @@
 # Rencana Implementasi — Simulator Underfrequency Relay (81U)
 
-> **Status:** DRAF untuk persetujuan user (2026-09-05).
+> **Status:** SELESAI — seluruh milestone M0–M4 dikerjakan, diuji, dan di-push
+> ke `origin/main` (lihat riwayat commit; PRD §7 ditutup). Dokumen ini tetap
+> sebagai kontrak implementasi & catatan proses.
 > **Sumber masukan:** `docs/PRD.md` (§5 = sumber kebenaran model), `docs/adr/0001–0005`,
 > `CONTEXT.md`, `docs/research/pln-underfrequency-practice.md`, `prototype.html`
 > (disetujui dengan revisi, lihat §2), `tools/shoot-proto.js` (harness screenshot).

@@ -253,13 +253,28 @@ Mengikuti pola proyek referensi: harness stub-DOM `tools/lens-harness.js` + regi
 `const API` di akhir script + tes Node murni:
 - `tools/model.test.js` — literal rantai §5 (ROCOF, droop, saturasi, UFLS pickup
   ketat/timer/reset/latch, shed MW, COLLAPSE, V ilustratif, status).
-- `tools/sld.test.js` — SLD (chip RPM/MW, pemutus, urutan pelepasan, animasi aliran).
-- `tools/ui.test.js` — seam desain & perilaku UI (mirror Differential).
-- `tools/shoot.js` (opsional, menyusul) — screenshot headless Chrome.
+- `tools/timeline.test.js` — determinisme, urutan trip, parity statis↔dinamis (< 1e-6),
+  batas f ≥ 47, RUNTUH.
+- `tools/sld.test.js` — geometri SLD (simbol lingkaran+salib, bus solid, vital teal,
+  pemutus miring + TERBUKA, TANPA stroke-dasharray).
+- `tools/charts.test.js` — literal skala grafik (fToY/tToX), ambang, gauge, tegangan.
+- `tools/ui.test.js` — seam desain & perilaku UI (mirror Differential) + kartu kanan.
+- `tools/shoot.js` — screenshot headless Chrome (CDP, tanpa dependensi) + zoom ASCII.
 
 Tidak ada auth/Clerk di v1 (keputusan Round 1). Bahasa UI/dokumen = Indonesia.
 
-## 7. Pertanyaan terbuka → dikunci saat prototipe
-- Ramp warna & lebar indikator batang gradien (diputuskan di prototipe).
-- Nomor-nomor k_V / τ tegangan ilustratif (default di atas; diverifikasi saat prototipe).
-- Jendela x default 0–20 s (menyesuaikan lama run; bisa auto-fit).
+## 7. Keputusan prototipe → DITUTUP (dikunci saat implementasi M1–M3)
+
+1. **Indikator batang gradien (dipilih user: "batang gradien + penunjuk")**:
+   kartu grafik frekuensi memuat kolom gauge 74×250 px; batang 18×214 px dengan
+   `linearGradient` stops: `0% #2E7D46`, `40% #2E7D46` (50 Hz masih hijau),
+   `55% #B5651D`, `100% #C0392B` (47 Hz merah); penunjuk garis kiri pada y(f),
+   tick 47–52, nilai f di bawah gauge.
+2. **Konstanta tegangan ilustratif DIKUNCI**: `k_V = 0,5`, τ turun ≈0,2 s,
+   τ pulih ≈3 s, lantai 0,85 pu — sesuai §5.8 (diverifikasi via timeline tests
+   + screenshots; dip aksen di SLD & kurva).
+3. **Jendela x grafik DIKUNCI 0–12 s** (skala `x(t) = 38 + t/12·628`); sampel
+   run di luar 12 s ter-klip; scrubber mengikuti `tMax` run (bisa > 12 s).
+4. Skala frekuensi DIKUNCI 47–52 Hz (`y(f) = 12 + (52−f)/5·214`), grid 0,5 Hz,
+   pita normal ±0,2 Hz, ambang UFLS putus-putus copper berlabel T1–T4, penanda
+   peristiwa (t = 1,0 s) & trip (lingkaran merah) sampai playhead.
