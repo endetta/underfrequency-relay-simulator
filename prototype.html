@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prototipe Interaktif — Simulator Underfrequency Relay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F1F3F0; --surface:#FFFFFF; --ink:#16233A; --ink-soft:#4A5568;
+    --blue:#1F4E8C; --blue-soft:#E7EEF6; --teal:#13697A; --copper:#B5651D; --copper-deep:#8C4E16; --copper-soft:#F5E9DC;
+    --line:#D6DAD2; --red:#C0392B; --red-soft:#F8E4E1; --green:#2E7D46; --green-soft:#E3F1E7;
+    --amber:#B7791F; --amber-soft:#FAF0DA; --teal-soft:#E2F0F3;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;font-size:14px;line-height:1.5;}
+  *{scrollbar-width:thin;scrollbar-color:var(--line) transparent;}
+  *::-webkit-scrollbar{width:6px;height:6px;}
+  *::-webkit-scrollbar-thumb{background:var(--line);border-radius:10px;}
+  .wrap{max-width:1660px;margin:0 auto;padding:12px 18px 92px;}
+
+  /* topbar */
+  .topbar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+  .topbar .tt{position:relative;display:inline-flex;align-items:center;font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;letter-spacing:-.01em;margin-right:auto;line-height:1.2;}
+  .topbar .tt::before{content:'';width:9px;height:9px;border-radius:50%;background:var(--copper);box-shadow:0 0 0 3.5px var(--copper-soft);margin-right:11px;flex:none;}
+  .topbar .tt-a{background:linear-gradient(100deg,var(--ink) 20%,#8A6B4D 42%,#FDFAF3 50%,#8A6B4D 58%,var(--ink) 80%);background-size:260% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;animation:ttShine 6s linear infinite;}
+  @keyframes ttShine{0%{background-position:140% 0}100%{background-position:-140% 0}}
+  .pt-badge{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--copper-deep);background:var(--copper-soft);border:1px dashed var(--copper);border-radius:20px;padding:3px 10px;}
+
+  /* ── LAYOUT GRID — varian A (tumpuk, PRD) & B (side-by-side) ── */
+  .layout{display:grid;gap:16px;}
+  body.va .layout{grid-template-columns:296px minmax(0,1fr) 336px;grid-template-areas:
+    "params sld  side"
+    "params tr   side"
+    "params fch  side"
+    "params vch  side";}
+  body.vb .layout{grid-template-columns:296px minmax(0,1fr) 336px;grid-template-areas:
+    "params sld side"
+    "params tr  ."
+    "params fch vch";}
+  .colP{grid-area:params;} .sld{grid-area:sld;} .tr{grid-area:tr;} .fch{grid-area:fch;} .vch{grid-area:vch;} .side{grid-area:side;}
+  @media(max-width:1240px){
+    body.va .layout,body.vb .layout{display:block;}
+    .layout>div{margin-bottom:14px;}
+  }
+
+  /* kartu & collapse */
+  .card,.plane-card,.chart-card,.side-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;}
+  .card{margin-bottom:14px;}
+  .card-h{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;margin:0 0 12px;}
+  .card-h .dot{width:7px;height:7px;border-radius:50%;background:var(--copper);}
+  .card-h .chev{margin-left:auto;color:var(--ink-soft);font-size:11px;transition:transform .15s;}
+  .card.collapsed .card-b{display:none;}
+  .card.collapsed .chev{transform:rotate(-90deg);}
+  .card.collapsed .card-h{margin-bottom:0;}
+  .q{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:var(--blue-soft);color:var(--blue);cursor:help;font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:700;flex:none;text-decoration:none;}
+  .card-h .q{width:13px;height:13px;font-size:9px;}
+
+  input[type=number],select{width:100%;min-width:0;max-width:100%;padding:4px 5px;border:1px solid var(--line);border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink);background:var(--bg);}
+  .colP,.card,.card-b,.field,.unit-row,.genrow,.genrow>div{min-width:0;}
+  .field{margin-bottom:11px;}
+  .field:last-child{margin-bottom:0;}
+  .field label{display:flex;justify-content:space-between;gap:6px;align-items:center;font-size:11.5px;color:var(--ink-soft);margin-bottom:4px;font-family:'JetBrains Mono',monospace;}
+  .field label b{color:var(--ink);}
+  .unit-row{border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin-bottom:8px;background:var(--bg);}
+  .unit-row:last-child{margin-bottom:0;}
+  .unit-name{font-family:'Space Grotesk',sans-serif;font-size:11.5px;font-weight:600;display:flex;align-items:center;gap:6px;}
+  .unit-name .st{width:7px;height:7px;border-radius:50%;background:var(--green);flex:none;}
+  .unit-name .st.trip{background:var(--red);}
+  .unit-name em{font-style:normal;margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-soft);}
+  .minilabel{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em;margin-top:4px;display:block;}
+  .genrow{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}
+  .btngroup{display:flex;gap:6px;flex-wrap:wrap;}
+  .btngroup button{flex:1;min-width:52px;padding:6px 5px;border:1px solid var(--line);background:var(--surface);border-radius:7px;font-family:'Inter',sans-serif;font-size:11px;font-weight:500;color:var(--ink-soft);cursor:pointer;}
+  .btngroup button.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:2px;}
+  .chips button{padding:4px 9px;border:1px solid var(--line);background:var(--surface);border-radius:14px;font-size:10.5px;color:var(--ink-soft);cursor:pointer;font-family:'Inter',sans-serif;}
+  .chips button.active{background:var(--copper);border-color:var(--copper);color:#fff;font-weight:600;}
+  .mini-btn{padding:5px 9px;border:1px solid var(--line);background:var(--surface);border-radius:7px;font-size:11px;font-weight:500;color:var(--ink-soft);cursor:pointer;font-family:'Inter',sans-serif;}
+  .mini-btn.hl{background:var(--copper);border-color:var(--copper);color:#fff;font-weight:600;}
+  .pln-note{font-size:10.5px;color:var(--amber);background:var(--amber-soft);border:1px solid #EBD9A8;border-radius:8px;padding:7px 9px;margin-top:4px;line-height:1.5;}
+  .stage-row{display:grid;grid-template-columns:56px 44px 40px 1fr;gap:5px;align-items:center;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-soft);margin-bottom:4px;}
+  .stage-row.head{font-family:'Space Grotesk',sans-serif;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);}
+  .stage-row b{color:var(--ink);}
+  .st-open{color:var(--red);}
+
+  .axis-t{font-family:'JetBrains Mono',monospace;font-size:9.5px;fill:var(--ink-soft);}
+  .axis-t.b{fill:var(--ink);font-weight:600;}
+  .curve{fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linejoin:round;}
+  .curve-v{fill:none;stroke:var(--teal);stroke-width:2;stroke-linejoin:round;}
+  .guide{stroke:var(--copper);stroke-width:1;stroke-dasharray:4 4;}
+  .gtext{font-family:'JetBrains Mono',monospace;font-size:9px;fill:var(--copper-deep);}
+
+  .transport{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px 10px;}
+  .playbtn{width:26px;height:26px;border-radius:50%;border:none;background:var(--copper);color:#fff;font-size:11px;cursor:pointer;flex:none;}
+  .playbtn.playing{background:var(--red);}
+  .spd{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;flex:none;}
+  .spd button{border:none;background:var(--surface);padding:3px 7px;font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--ink-soft);cursor:pointer;}
+  .spd button.active{background:var(--blue);color:#fff;}
+  .scrub{flex:1;margin:0 2px;accent-color:var(--blue);height:14px;}
+  .tclock{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-soft);flex:none;}
+  .tclock b{color:var(--ink);}
+  .statebar{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--ink-soft);background:var(--bg);border-radius:7px;padding:3px 8px;margin-top:6px;word-break:break-all;}
+
+  .chart-card .h3,.side-card .h3,.plane-card .h3{margin:0 0 8px;font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:7px;}
+  .chart-card .h3 .dot,.side-card .h3 .dot,.plane-card .h3 .dot{width:7px;height:7px;border-radius:50%;background:var(--copper);flex:none;}
+  .plane-card svg,.chart-card svg{display:block;width:100%;height:auto;}
+  .chart-wrap{display:flex;gap:12px;align-items:stretch;}
+  .chart-main{flex:1;min-width:0;}
+
+  /* indikator frekuensi global */
+  .fgauge{display:flex;flex-direction:column;align-items:center;width:88px;flex:none;border-left:1px solid var(--line);padding-left:12px;}
+  .fgauge .gtitle{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.06em;text-align:center;}
+  .fgauge .gval{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:600;color:var(--ink);margin:3px 0;}
+  .fgauge .gval small{font-size:9.5px;color:var(--ink-soft);font-weight:400;}
+  .gbar-zone{position:relative;width:34px;flex:1;min-height:140px;}
+  .gbar-zone svg{position:absolute;inset:0;width:100%;height:100%;}
+
+  .foot{font-size:10.5px;color:var(--ink-soft);margin-top:6px;}
+  .foot b{color:var(--amber);}
+  .legend{display:flex;flex-wrap:wrap;gap:10px 14px;font-size:10.5px;color:var(--ink-soft);font-family:'JetBrains Mono',monospace;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);}
+  .legend span{display:inline-flex;align-items:center;gap:5px;}
+  .legend i{width:9px;height:9px;border-radius:3px;display:inline-block;flex:none;border:1px solid rgba(22,35,58,.15);}
+  .legend .sq{width:9px;height:9px;border-radius:2px;}
+
+  /* kartu kanan */
+  .tabs{display:flex;gap:4px;background:var(--bg);border-radius:9px;padding:3px;margin:4px 0 10px;}
+  .tabs button{flex:1;border:none;background:transparent;padding:6px 4px;border-radius:7px;font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:600;color:var(--ink-soft);cursor:pointer;}
+  .tabs button.active{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(22,35,58,.14);}
+  .tab-pane{display:none;}
+  .tab-pane.active{display:block;}
+  .status-pill{display:flex;align-items:center;gap:8px;border-radius:10px;padding:10px 12px;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;margin-bottom:10px;}
+  .status-pill .dot{width:9px;height:9px;border-radius:50%;flex:none;}
+  .st-bal{background:var(--green-soft);color:var(--green);} .st-bal .dot{background:var(--green);}
+  .st-def{background:var(--amber-soft);color:var(--amber);} .st-def .dot{background:var(--amber);}
+  .st-shed{background:var(--red-soft);color:var(--red);} .st-shed .dot{background:var(--red);}
+  .st-rec{background:var(--green-soft);color:var(--green);} .st-rec .dot{background:var(--green);}
+  .st-col{background:var(--red);color:#fff;} .st-col .dot{background:#fff;}
+  .rline{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:3.5px 0;border-bottom:1px dashed var(--line);font-family:'JetBrains Mono',monospace;font-size:11.5px;}
+  .rline:last-child{border-bottom:none;}
+  .rline span:first-child{color:var(--ink-soft);font-family:'Inter',sans-serif;font-size:11px;flex:none;}
+  .rline b{font-weight:600;}
+  .ev{display:flex;gap:8px;padding:7px 0;border-bottom:1px dashed var(--line);font-size:11.5px;}
+  .ev:last-child{border-bottom:none;}
+  .ev .n{flex:none;width:20px;height:20px;border-radius:50%;background:var(--red-soft);color:var(--red);font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center;}
+  .ev .b{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:12px;}
+  .ev .s{color:var(--ink-soft);font-size:10.5px;font-family:'JetBrains Mono',monospace;margin-top:2px;}
+  .ev .t{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--copper-deep);background:var(--copper-soft);border-radius:5px;padding:1px 5px;margin-top:3px;display:inline-block;}
+
+  /* bottom variant switcher */
+  .vsw{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;background:var(--ink);color:#FDFAF3;border-radius:30px;padding:7px 12px;box-shadow:0 12px 30px rgba(22,35,58,.4);z-index:60;font-family:'Space Grotesk',sans-serif;font-size:11px;}
+  .vsw button{border:1px solid rgba(255,255,255,.25);background:transparent;color:#FDFAF3;border-radius:20px;padding:4px 11px;font-size:11px;cursor:pointer;font-family:'Space Grotesk',sans-serif;}
+  .vsw button.active{background:#FDFAF3;color:var(--ink);font-weight:600;}
+  .vsw .vtxt{opacity:.75;font-size:10px;max-width:210px;line-height:1.35;}
+</style>
+</head>
+<body class="va">
+<div class="wrap">
+  <div class="topbar">
+    <div class="tt"><span class="tt-a">Simulator Underfrequency Relay</span></div>
+    <span class="pt-badge">PROTOTIPE INTERAKTIF v0.2 — model TIRUAN (bukan produk, bukan model final)</span>
+  </div>
+
+  <div class="layout">
+    <!-- ───────── KOLOM KIRI: parameter ───────── -->
+    <div class="colP">
+      <div class="card" data-c="gen">
+        <div class="card-h"><span class="dot"></span>Unit pembangkit <a class="q" title="Parameter per unit; RPM = 120·f/kutub (turunan). Di prototipe: nilai tetap, hanya dibaca.">?</a><span class="chev">▾</span></div>
+        <div class="card-b">
+          <div class="unit-row">
+            <div class="unit-name"><span class="st" id="uG1dot"></span>G1 — Thermal 600 MW <em id="uG1st">ONLINE</em></div>
+            <div class="genrow"><div><span class="minilabel">output</span><input type="number" value="500" disabled></div><div><span class="minilabel">H (s)</span><input type="number" value="5.0" disabled></div><div><span class="minilabel">R (%)</span><input type="number" value="5" disabled></div></div>
+            <div class="genrow"><div><span class="minilabel">MVA</span><input type="number" value="700" disabled></div><div><span class="minilabel">kutub</span><input type="number" value="2" disabled></div><div><span class="minilabel">govMax</span><input type="number" value="640" disabled></div></div>
+          </div>
+          <div class="unit-row">
+            <div class="unit-name"><span class="st" id="uG2dot"></span>G2 — Hydro 400 MW <em id="uG2st">ONLINE</em></div>
+            <div class="genrow"><div><span class="minilabel">output</span><input type="number" value="350" disabled></div><div><span class="minilabel">H (s)</span><input type="number" value="4.0" disabled></div><div><span class="minilabel">R (%)</span><input type="number" value="4" disabled></div></div>
+            <div class="genrow"><div><span class="minilabel">MVA</span><input type="number" value="450" disabled></div><div><span class="minilabel">kutub</span><input type="number" value="4" disabled></div><div><span class="minilabel">govMax</span><input type="number" value="430" disabled></div></div>
+          </div>
+          <div class="unit-row">
+            <div class="unit-name"><span class="st" id="uG3dot"></span>G3 — Gas 300 MW <em id="uG3st">ONLINE</em></div>
+            <div class="genrow"><div><span class="minilabel">output</span><input type="number" value="250" disabled></div><div><span class="minilabel">H (s)</span><input type="number" value="4.5" disabled></div><div><span class="minilabel">R (%)</span><input type="number" value="5" disabled></div></div>
+            <div class="genrow"><div><span class="minilabel">MVA</span><input type="number" value="330" disabled></div><div><span class="minilabel">kutub</span><input type="number" value="2" disabled></div><div><span class="minilabel">govMax</span><input type="number" value="320" disabled></div></div>
+          </div>
+          <div class="field" style="margin-top:9px">
+            <label>Impor interkoneksi <b id="impVal">400 MW</b></label>
+            <input type="range" id="impRange" min="0" max="600" step="10" value="400">
+            <div style="font-size:10px;color:var(--ink-soft)">0 = sistem mandiri · berubah → Reset run</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" data-c="uf">
+        <div class="card-h"><span class="dot"></span>Beban &amp; tahap UFLS <a class="q" title="Ambang & porsi default = praktik tipikal (catatan ambar).">?</a><span class="chev">▾</span></div>
+        <div class="card-b">
+          <div class="stage-row head"><span>tahap</span><span>ambang</span><span>tunda</span><span>lepas</span></div>
+          <div class="stage-row"><b>T1</b><span>49,50 Hz</span><span>0,20 s</span><span>5%</span></div>
+          <div class="stage-row"><b>T2</b><span>49,00</span><span>0,30</span><span>10%</span></div>
+          <div class="stage-row"><b>T3</b><span>48,50</span><span>0,40</span><span>15%</span></div>
+          <div class="stage-row"><b>T4</b><span>48,00</span><span>0,50</span><span>20%</span></div>
+          <div class="stage-row" style="border-top:1px solid var(--line);padding-top:4px;margin-top:4px"><span>vital</span><span colspan="3">tidak pernah dilepas</span></div>
+          <div class="pln-note">⚠ Ambang &amp; porsi = <b>praktik tipikal global</b>; belum diverifikasi ke pedoman resmi PLN.</div>
+        </div>
+      </div>
+
+      <div class="card" data-c="scn">
+        <div class="card-h"><span class="dot"></span>Skenario peristiwa <span class="chev">▾</span></div>
+        <div class="card-b">
+          <div class="field"><label>Pilih peristiwa (terjadi @ t = 1,0 s)</label>
+            <div class="chips" id="scnChips"></div>
+          </div>
+          <button class="mini-btn hl" id="runBtn" style="width:100%">▶ Jalankan run baru</button>
+          <div class="statebar" id="stateBar"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───────── TENGAH: SLD → transport → grafik frekuensi ───────── -->
+    <div class="sld plane-card">
+      <div class="h3"><span class="dot"></span>Diagram satu garis <span class="axis-t" style="margin-left:6px;text-transform:none" id="sldNote">(t = 0 s · setimbang)</span></div>
+      <svg id="sldSvg" viewBox="0 0 920 250" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="legend">
+        <span><i style="background:var(--green-soft);border-color:var(--green)"></i> ONLINE / governor aktif</span>
+        <span><i style="background:var(--red-soft);border-color:var(--red)"></i> TRIP / tahap terbuka</span>
+        <span><i style="background:var(--copper-soft);border-color:var(--copper)"></i> batas governor (maks gov)</span>
+        <span><i style="background:var(--teal-soft);border-color:#13697A"></i> beban vital</span>
+        <span><i class="sq" style="background:#fff;border:1px solid var(--red);transform:rotate(45deg)"></i> pemutus terbuka</span>
+      </div>
+    </div>
+
+    <div class="tr transport">
+      <button class="playbtn" id="playBtn" title="Main / jeda">▶</button>
+      <div class="spd" id="spdBox">
+        <button data-s="0.5">0,5×</button><button data-s="1" class="active">1×</button><button data-s="2">2×</button>
+      </div>
+      <input type="range" class="scrub" id="scrub" min="0" max="1" step="1" value="0">
+      <div class="tclock">t <b id="tVal">0,00 s</b> / 12 s</div>
+      <button class="mini-btn" id="resetBtn">Reset</button>
+    </div>
+
+    <div class="fch chart-card">
+      <div class="h3"><span class="dot"></span>Grafik frekuensi <a class="q" title="Kurva f(t); garis putus-putus = ambang tahap. Pita hijau = 50 ±0,2 Hz.">?</a></div>
+      <div class="chart-wrap">
+        <div class="chart-main"><svg id="fSvg" viewBox="0 0 660 240"></svg></div>
+        <div class="fgauge">
+          <div class="gtitle">Frekuensi global</div>
+          <div class="gval" id="gVal">50,00<small> Hz</small></div>
+          <div class="gbar-zone"><svg id="gSvg" viewBox="0 0 34 200" preserveAspectRatio="none"></svg></div>
+          <div class="gtitle">47 Hz</div>
+        </div>
+      </div>
+      <div class="foot">Indikator batang: gradien hijau (50 Hz) → merah (47 Hz), penunjuk f live (varian keputusan Round 4).</div>
+    </div>
+
+    <!-- ───────── KANAN: tegangan (A: di bawah kurva; B: sebelah kurva) + status ───────── -->
+    <div class="vch chart-card">
+      <div class="h3"><span class="dot"></span>Grafik tegangan <a class="q" title="Model ILUSTRATIF — bukan hasil aliran daya. Lekukan saat defisit, pulih eksponensial.">?</a></div>
+      <svg id="vSvg" viewBox="0 0 660 160"></svg>
+      <div class="foot" id="vFoot">V ≈ 1,00 pu (≈ 20 kV)</div>
+    </div>
+
+    <div class="side side-card">
+      <div class="h3"><span class="dot"></span>Status &amp; pelepasan</div>
+      <div class="tabs">
+        <button class="tab active" data-tab="1">Kondisi sistem</button>
+        <button class="tab" data-tab="2">Urutan pelepasan</button>
+      </div>
+      <div class="tab-pane active" id="tp1">
+        <div class="status-pill st-bal" id="statusPill"><span class="dot"></span><span id="statusTxt">SEIMBANG</span></div>
+        <div class="rline"><span>Frekuensi</span><b id="rF">50,00 Hz</b></div>
+        <div class="rline"><span>ROCOF</span><b id="rRoc">0,00 Hz/s</b></div>
+        <div class="rline"><span>Beban total</span><b id="rLoad">1.100 MW</b></div>
+        <div class="rline"><span>Pembangkitan</span><b id="rSup">1.100 MW</b></div>
+        <div class="rline"><span>Dukungan governor</span><b id="rGov">0 MW</b></div>
+        <div class="rline"><span>Headroom tersisa</span><b id="rHead">290 MW</b></div>
+        <div class="rline"><span>Defisit</span><b id="rDef">0 MW</b></div>
+        <div class="foot" style="margin-top:6px">Live: semua nilai mengikuti posisi main/scrub.</div>
+      </div>
+      <div class="tab-pane" id="tp2">
+        <div id="evList"></div>
+        <div class="rline" style="margin-top:8px"><span>Total terlepas</span><b id="rShed">0 MW</b></div>
+        <div class="foot" style="margin-top:6px">Trip berurutan waktu; tahap yang sudah trip terkunci.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot" style="border-top:1px solid var(--line);padding-top:8px;margin-top:18px">
+    <b>Catatan:</b> angka dihasilkan model tiruan sederhana (integrasi numerik demo) HANYA agar tombol/live-info terasa —
+    <b>bukan</b> model PRD §5 dan bukan dasar tes. Yang direview: tata letak, tombol, dan informasi yang disampaikan
+    untuk menyetujui/merevisi PRD. Geser <b>Impor</b> &amp; pilih <b>peristiwa</b> → <b>▶ Jalankan</b> → amati.
+  </div>
+</div>
+
+<div class="vsw">
+  <span>Tata letak:</span>
+  <button class="active" data-v="a">A · Tumpuk (PRD)</button>
+  <button data-v="b">B · Sisi-ke-sisi</button>
+  <span class="vtxt" id="vDesc"></span>
+</div>
+
+<script>
+/* ═══════════ PROTOTIPE: model tiruan (DEMO) — bukan model final ═══════════ */
+var GENS = [
+  {id:'G1', label:'G1 — Thermal 600 MW', P0:500, gMax:640, H:5.0, MVA:700, R:0.05, p:2},
+  {id:'G2', label:'G2 — Hydro 400 MW',   P0:350, gMax:430, H:4.0, MVA:450, R:0.04, p:4},
+  {id:'G3', label:'G3 — Gas 300 MW',     P0:250, gMax:320, H:4.5, MVA:330, R:0.05, p:2}
+];
+var STAGES = [
+  {id:'T1', thr:49.50, dly:0.20, pct:0.05, done:false, timer:0},
+  {id:'T2', thr:49.00, dly:0.30, pct:0.10, done:false, timer:0},
+  {id:'T3', thr:48.50, dly:0.40, pct:0.15, done:false, timer:0},
+  {id:'T4', thr:48.00, dly:0.50, pct:0.20, done:false, timer:0}
+];
+var TMAX = 12, F0 = 50, DT = 0.005;
+var SCEN = [
+  {id:'none',    label:'Seimbang (tanpa peristiwa)'},
+  {id:'g1',      label:'Lepas G1'}, {id:'g3', label:'Lepas G3'},
+  {id:'imp',     label:'Lepas interkoneksi'},
+  {id:'beban',   label:'+ Beban 200 MW'},
+  {id:'runtuh',  label:'+ Beban besar (runtuh)'}
+];
+var curScn = 'imp';
+var sim = null; // hasil simulasi
+var running = false, tNow = 0, speed = 1, lastWall = 0;
+
+/* simulasi numerik demo (Euler; droop statis + headroom; UFLS ketat+latch) */
+function runSim(){
+  var imp = +document.getElementById('impRange').value;
+  var gs = GENS.map(function(g){return {id:g.id, label:g.label, P0:g.P0, gMax:g.gMax, H:g.H, MVA:g.MVA, R:g.R, p:g.p, online:true, tripAt:-1, blk:false};});
+  var load = 0; gs.forEach(function(g){load += g.P0;}); load += imp;          // setimbang awal
+  var stages = STAGES.map(function(s){return {id:s.id, thr:s.thr, dly:s.dly, pct:s.pct, done:false, timer:0, shedAt:-1, mw:0};});
+  var feeders = STAGES.map(function(s,i){return {stage:s.id, frac:s.pct, mw: Math.round(load*s.pct), open:false};});
+  var vital = load - feeders.reduce(function(a,f){return a+f.mw;},0);
+  var evLog = [], tev = 1.0, applied = false, collapse = false, arrAt = -1, fEvDip = 0;
+  var Sbase = gs.reduce(function(a,g){return a+(g.online?g.MVA:0);},0);
+  var Hsys  = gs.reduce(function(a,g){return a+(g.online?g.H*g.MVA:0);},0) / Sbase;
+  var ts=[], fs=[], vs=[], out=[]; // per-frame outputs
+  var f = F0, V = 1.0, dip = 0, prevF = f;
+
+  // defisit awal peristiwa (untuk model tegangan)
+  function applyEvent(){
+    applied = true; var D0 = 0;
+    if(curScn==='g1'||curScn==='g3'){
+      var g = gs.find(function(x){return x.id===(curScn==='g1'?'G1':'G3');});
+      g.online = false; g.tripAt = tev; D0 = g.P0;
+    } else if(curScn==='imp'){ D0 = imp; imp = 0; }
+    else if(curScn==='beban'){ load += 200; D0 = 200; }
+    else if(curScn==='runtuh'){ load += 1000; D0 = 1000; }
+    fEvDip = Math.min(0.15, 0.5 * D0 / Sbase);
+    evLog.push({t:tev, txt:'Peristiwa: '+(SCEN.find(function(s){return s.id===curScn;})||{}).label, f:f});
+  }
+
+  for(var t=0;t<=TMAX;t+=DT){
+    if(!applied && t>=tev){ applyEvent(); }
+    // respons governor
+    var sup=0, gov=0;
+    gs.forEach(function(g){
+      if(!g.online){return;}
+      var resp = Math.max(0, (F0-f)/F0 * (g.MVA/g.R));        // droop law (pu)
+      var p = Math.min(g.P0 + resp, g.gMax);
+      sup += p; gov += Math.max(0,p-g.P0);
+    });
+    var deficit = load - (sup + imp);
+    // UFLS
+    stages.forEach(function(s){
+      if(s.done) return;
+      if(f < s.thr && Math.abs(f-s.thr) > 1e-9){ s.timer += DT; }
+      else { s.timer = 0; }
+      if(s.timer >= s.dly){
+        s.done = true; s.shedAt = t;
+        var fd = feeders.find(function(x){return x.stage===s.id;});
+        var mw = fd ? fd.mw : Math.round(load*s.pct);
+        if(fd){fd.open = true;}
+        load -= mw; s.mw = mw;
+        evLog.push({t:t, txt:'Tahap '+s.id+' → Beban '+s.id+' terlepas', f:f, mw:mw, stage:s.id});
+      }
+    });
+    // integrasi ayunan (demo)
+    var S = gs.reduce(function(a,g){return a+(g.online?g.MVA:0);},0);
+    var H = gs.reduce(function(a,g){return a+(g.online?g.H*g.MVA:0);},0) / Math.max(1,S);
+    var dfdt = (F0/(2*H*S)) * (sup + imp - load);
+    if(f <= 47.0){ collapse = true; }
+    prevF = f;
+    f += dfdt*DT;
+    if(f < 47.0){ f = 47.0; }
+    // tegangan ilustratif
+    if(applied){
+      if(arrAt<0 && dfdt > -0.001 && f > 49.0){ arrAt = t; }
+      if(collapse){ V = Math.max(0.85, V - 0.02*DT/0.005); }
+      else if(arrAt<0){ V = 1 - fEvDip * (1 - Math.exp(-(t-tev)/0.2)); }
+      else { V = 1 - fEvDip * Math.exp(-(t-arrAt)/3); }
+    }
+    ts.push(t); fs.push(f); vs.push(V);
+    out.push({sup:sup, gov:gov, load:load, imp:imp, head: gs.reduce(function(a,g){return a+(g.online?g.gMax-g.P0:0);},0)-gov, deficit:Math.max(0,deficit), gs:gs.map(function(g){return {id:g.id,online:g.online,p:g.online?Math.min(g.P0 + Math.max(0,(F0-f)/F0*(g.MVA/g.R)),g.gMax):0, rpm:g.online?(120*f/g.p):0, gMax:g.gMax,P0:g.P0};}), feeders:feeders.map(function(x){return {stage:x.stage,mw:x.mw,open:x.open};}), vital:vital});
+  }
+  sim = {ts:ts, fs:fs, vs:vs, out:out, ev:evLog, imp0:imp, collapse:collapse, feeders:feeders, stages:stages, load0:load, vital:vital, tmax:TMAX};
+}
+
+/* ── state helpers ── */
+function stateAt(t){
+  if(!sim) return null;
+  var i = 0;
+  while(i < sim.ts.length-1 && sim.ts[i+1] <= t) i++;
+  return {t:sim.ts[i], f:sim.fs[i], v:sim.vs[i], o:sim.out[i], i:i};
+}
+function statusOf(st){
+  if(sim.collapse && st.f <= 47.01) return {k:'RUNTUH', c:'st-col', txt:'RUNTUH'};
+  if(st.f <= 49.8){ var shed = sim.ev.filter(function(e){return e.stage;}).length>0;
+    return {k:'shed', c: shed?'st-shed':'st-def', txt: shed?'PELEPASAN BEBAN':'DEFISIT'}; }
+  if(st.f > 50.2) return {k:'bal', c:'st-def', txt:'OVERFREKUENSI'};
+  return {k:'bal', c:'st-bal', txt:'SEIMBANG'};
+}
+
+/* ── render: SLD ── */
+function renderSld(st){
+  var BUSY = 70, gx = [170, 330, 490];
+  var h = '<defs><marker id="arB" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#1F4E8C"/></marker></defs>';
+  // bus bar tebal, solid
+  h += '<line x1="110" y1="'+BUSY+'" x2="850" y2="'+BUSY+'" stroke="#16233A" stroke-width="4"/>';
+  h += '<text x="480" y="56" class="axis-t b" text-anchor="middle">Bus 20 kV</text>';
+  h += '<text x="250" y="24" class="axis-t" fill="#1F4E8C">suplai '+Math.round(st.o.sup)+' MW</text>';
+  h += '<text x="730" y="24" class="axis-t" fill="#16233A" text-anchor="end">beban total '+Math.round(st.o.load)+' MW</text>';
+  // interkoneksi: kotak label + pemutus; garis SOLID; status lewat label & pemutus miring
+  var impOn = st.o.imp > 0.5;
+  var icol = impOn ? '#2E7D46' : '#C0392B';
+  h += '<line x1="95" y1="34" x2="95" y2="'+BUSY+'" stroke="#16233A" stroke-width="2.2"/>';
+  h += '<rect x="83" y="46" width="24" height="16" rx="3" fill="#fff" stroke="#16233A" stroke-width="1.5" transform="rotate('+(impOn?0:45)+' 95 54)"/>';
+  h += '<rect x="62" y="4" width="56" height="24" rx="6" fill="'+(impOn?'#E3F1E7':'#F8E4E1')+'" stroke="'+icol+'" stroke-width="1.6"/>';
+  h += '<text x="90" y="20" font-size="10.5" fill="'+icol+'" text-anchor="middle" font-weight="600">Impor</text>';
+  h += '<text x="126" y="22" class="axis-t" fill="'+icol+'" font-weight="600">'+(impOn? Math.round(st.o.imp)+' MW' : '0 MW · LEPAS')+'</text>';
+  // generator: lingkaran + salib (×) + sambungan solid ke bus + chip RPM/MW
+  var i = 0;
+  st.o.gs.forEach(function(g){
+    var gx2 = gx[i++];
+    var up = g.online;
+    var col = up ? (g.p < g.gMax - 0.5 ? '#1F4E8C' : '#8C4E16') : '#9AA';
+    var bgc = up ? (g.p < g.gMax - 0.5 ? '#E7EEF6' : '#F5E9DC') : '#EDEDED';
+    h += '<circle cx="'+gx2+'" cy="128" r="17" fill="'+bgc+'" stroke="'+col+'" stroke-width="1.8"/>';
+    h += '<line x1="'+(gx2-7)+'" y1="121" x2="'+(gx2+7)+'" y2="135" stroke="'+col+'" stroke-width="1.8"/>';
+    h += '<line x1="'+(gx2-7)+'" y1="135" x2="'+(gx2+7)+'" y2="121" stroke="'+col+'" stroke-width="1.8"/>';
+    h += '<line x1="'+gx2+'" y1="111" x2="'+gx2+'" y2="'+BUSY+'" stroke="#16233A" stroke-width="2.4"'+(up?' marker-end="url(#arB)"':' opacity=".35"')+'/>';
+    h += '<text x="'+gx2+'" y="162" font-size="12" fill="'+(up?'#16233A':'#9AA')+'" text-anchor="middle" font-weight="700">'+g.id+'</text>';
+    h += '<rect x="'+(gx2-54)+'" y="170" width="108" height="34" rx="8" fill="'+bgc+'" stroke="'+col+'"/>';
+    h += '<text x="'+gx2+'" y="184" class="axis-t" text-anchor="middle" fill="'+col+'">'+(up ? (g.rpm.toFixed(0)+' rpm') : '— rpm')+'</text>';
+    h += '<text x="'+gx2+'" y="197" class="axis-t b" text-anchor="middle" fill="'+col+'">'+(up ? Math.round(g.p)+' MW'+(g.p>=g.gMax-0.5?' (maks gov)':'') : 'TRIP')+'</text>';
+  });
+  // feeder: garis SOLID dari bus; pemutus (kotak lurus = tertutup, miring = terbuka); vital warna TEAL
+  var fx = [620, 680, 740, 800, 860];
+  var fl = ['T1','T2','T3','T4','VITAL'];
+  fl.forEach(function(id2, k){
+    var f = st.o.feeders[k] || null;
+    var open = f ? f.open : false;
+    var vital = k === 4;
+    var col = open ? '#C0392B' : (vital ? '#13697A' : '#2E7D46');
+    var bgc = open ? '#F8E4E1' : (vital ? '#E2F0F3' : '#E3F1E7');
+    h += '<line x1="'+fx[k]+'" y1="'+BUSY+'" x2="'+fx[k]+'" y2="196" stroke="'+col+'" stroke-width="2.4"/>';
+    h += '<rect x="'+(fx[k]-6)+'" y="80" width="12" height="12" rx="2" fill="'+bgc+'" stroke="'+col+'" stroke-width="1.6" transform="rotate('+(open?45:0)+' '+fx[k]+' 86)"/>';
+    h += '<text x="'+fx[k]+'" y="216" font-size="10" fill="'+col+'" text-anchor="middle" font-weight="'+(vital?600:400)+'">'+id2+(open?' · TERBUKA':'')+'</text>';
+    h += '<text x="'+fx[k]+'" y="230" class="axis-t" text-anchor="middle" fill="'+col+'">'+(vital ? 'vital · '+Math.round(st.o.vital)+' MW' : Math.round(f?f.mw:0)+' MW')+'</text>';
+  });
+  document.getElementById('sldSvg').innerHTML = h;
+  document.getElementById('sldNote').textContent = '(t = '+tNow.toFixed(2)+' s · '+statusOf(st).txt.toLowerCase()+')';
+}
+
+/* ── render: grafik frekuensi + indikator ── */
+function fy(Hz){ return 30 + (52-Hz)/5*190; }      // 52→30, 47→220
+function fx(t){ return 28 + t/12*612; }
+function renderFreq(st){
+  var h='';
+  h += '<rect x="0" y="'+fy(50.2)+'" width="660" height="'+((fy(49.8)-fy(50.2)))+'" fill="#E3F1E7" opacity=".55"/>';
+  for(var zz=47.5; zz<=51.5; zz+=0.5){ if(zz===50) continue; h += '<line x1="28" y1="'+fy(zz)+'" x2="640" y2="'+fy(zz)+'" stroke="var(--line)" opacity=".5"/>'; }
+  h += '<line x1="28" y1="'+fy(50)+'" x2="640" y2="'+fy(50)+'" stroke="var(--ink)" stroke-width="1.2" opacity=".7"/>';
+  h += '<text x="600" y="'+(fy(50)-5)+'" class="axis-t b">50,0 (pita normal ±0,2)</text>';
+  var stg=[[49.5,'T1'],[49.0,'T2'],[48.5,'T3'],[48.0,'T4']];
+  stg.forEach(function(s){ h+='<line x1="28" y1="'+fy(s[0])+'" x2="640" y2="'+fy(s[0])+'" class="guide"/><text x="640" y="'+(fy(s[0])-3)+'" class="gtext" text-anchor="end">'+s[1]+' '+s[0].toFixed(2).replace('.',',')+'</text>'; });
+  // kurva sampai tNow
+  var d='M'; var step = Math.max(1, Math.floor((st.i)/400));
+  for(var i=0;i<=st.i;i+=step){ d+=' '+(fx(sim.ts[i]).toFixed(1))+','+(fy(sim.fs[i]).toFixed(1)); }
+  h += '<polyline class="curve" points="'+d.replace('M','').trim()+'" style="clip-path:url(#fclip)"/>';
+  h += '<defs><clipPath id="fclip"><rect x="0" y="0" width="660" height="240"/></clipPath></defs>';
+  // garis ambang y labels; sumbu
+  h += '<line x1="28" y1="220" x2="640" y2="220" stroke="var(--ink)"/>';
+  [52,51,50,49,48,47].forEach(function(z){ h+='<text x="22" y="'+(fy(z)+3)+'" class="axis-t" text-anchor="end">'+z.toFixed(1).replace('.',',')+'</text>'; h+='<line x1="28" y1="'+fy(z)+'" x2="32" y2="'+fy(z)+'" stroke="var(--ink)"/>'; });
+  // penanda peristiwa & trip
+  sim.ev.filter(function(e){return e.t <= st.t;}).forEach(function(e){ var x=fx(e.t);
+    if(e.stage){ h+='<circle cx="'+x+'" cy="'+fy(e.f)+'" r="3.5" fill="#C0392B"/><text x="'+(x+5)+'" y="'+(fy(e.f)-6)+'" class="gtext" fill="#C0392B">'+e.stage+' ×</text>'; }
+    else { h+='<path d="M'+(x-5)+' 22 L'+(x+5)+' 28 M'+(x-5)+' 28 L'+(x+5)+' 22" stroke="#C0392B" stroke-width="2"/>'; h+='<text x="'+(x+8)+'" y="26" class="gtext" fill="#C0392B">'+e.txt+'</text>'; }
+  });
+  // posisi sekarang
+  h += '<line x1="'+fx(st.t)+'" y1="18" x2="'+fx(st.t)+'" y2="220" stroke="var(--copper)" stroke-width="1.3" stroke-dasharray="3 3"/>';
+  h += '<text x="600" y="16" class="axis-t">t = '+tNow.toFixed(2)+' s</text>';
+  h += '<text x="632" y="236" class="axis-t" text-anchor="end">t (s) →</text>';
+  document.getElementById('fSvg').innerHTML = h;
+  // indikator gradien
+  var ih='<defs><linearGradient id="gradf" x1="0" y1="0" x2="0" y2="1">'
+    +'<stop offset="0" stop-color="#2E9E44"/><stop offset=".2" stop-color="#8CC63F"/><stop offset=".38" stop-color="#F2C14E"/>'
+    +'<stop offset=".56" stop-color="#E8A13C"/><stop offset=".74" stop-color="#D2612E"/><stop offset="1" stop-color="#C0392B"/></linearGradient></defs>';
+  ih += '<rect x="0" y="0" width="34" height="200" rx="10" fill="url(#gradf)"/>';
+  [49.5,49.0,48.5,48.0].forEach(function(z){ var yy=(52-z)/5*200; ih+='<line x1="0" y1="'+yy+'" x2="34" y2="'+yy+'" stroke="#fff" stroke-opacity=".5"/>'; });
+  var yp=(52-st.f)/5*200;
+  ih += '<path d="M-3 '+yp+' L37 '+yp+' L33 '+(yp-5)+' L37 '+yp+' L33 '+(yp+5)+' Z" fill="#16233A"/>';
+  document.getElementById('gSvg').innerHTML = ih;
+  document.getElementById('gVal').innerHTML = st.f.toFixed(2).replace('.',',')+'<small> Hz</small>';
+}
+
+/* ── render: tegangan ── */
+function vy(v){ return 132 - (v-0.85)/0.2*120; }    // 0.85→132, 1.05→12
+function renderVolt(st){
+  var h='';
+  h += '<line x1="30" y1="132" x2="640" y2="132" stroke="var(--ink)"/>';
+  h += '<line x1="30" y1="12" x2="30" y2="132" stroke="var(--ink)"/>';
+  h += '<text x="628" y="150" class="axis-t" text-anchor="end">t (s) →</text>';
+  [1.05,1.00,0.95,0.90,0.85].forEach(function(z){ h+='<text x="24" y="'+(vy(z)+3)+'" class="axis-t" text-anchor="end">'+z.toFixed(2).replace('.',',')+'</text>'; h+='<line x1="30" y1="'+vy(z)+'" x2="34" y2="'+vy(z)+'" stroke="var(--ink)"/>'; });
+  var pts=[]; var step=Math.max(1,Math.floor(st.i/300));
+  for(var i=0;i<=st.i;i+=step){ pts.push(fx(sim.ts[i]).toFixed(1)+','+vy(sim.vs[i]).toFixed(1)); }
+  h += '<polyline class="curve-v" points="'+pts.join(' ')+'"/>';
+  document.getElementById('vSvg').innerHTML = h;
+  document.getElementById('vFoot').textContent = 'V ≈ '+st.v.toFixed(2).replace('.',',')+' pu (≈ '+(20*st.v).toFixed(0)+' kV) · model ilustratif — bukan hasil aliran daya';
+}
+
+/* ── render: kartu kanan + unit + statebar ── */
+function fmt(x){ return x.toLocaleString('id-ID'); }
+function renderSide(st){
+  var st2=statusOf(st);
+  var pill=document.getElementById('statusPill');
+  pill.className='status-pill '+st2.c;
+  document.getElementById('statusTxt').textContent=st2.txt;
+  var i1=Math.max(0,st.i-1);
+  var rocof=(sim.fs[st.i]-sim.fs[i1])/(sim.ts[st.i]-sim.ts[i1]);
+  document.getElementById('rF').textContent=st.f.toFixed(2).replace('.',',')+' Hz';
+  document.getElementById('rRoc').textContent=(rocof>=0?'+':'−')+Math.abs(rocof).toFixed(2).replace('.',',')+' Hz/s';
+  document.getElementById('rLoad').textContent=fmt(Math.round(st.o.load))+' MW';
+  document.getElementById('rSup').textContent=fmt(Math.round(st.o.sup))+ (st.o.imp>0.5? ' MW + imp '+Math.round(st.o.imp):' MW');
+  document.getElementById('rGov').textContent='+'+fmt(Math.round(st.o.gov))+' MW';
+  var head=st.o.head;
+  document.getElementById('rHead').textContent=fmt(Math.max(0,Math.round(head)))+' MW';
+  document.getElementById('rDef').textContent=fmt(Math.round(Math.max(0, st.o.load-(st.o.sup+st.o.imp))))+' MW';
+  // ev list
+  var shedEv=sim.ev.filter(function(e){return e.stage;});
+  var prev=sim.load0 - sim.vital;
+  var el='';
+  if(!shedEv.length){ el='<div class="foot">Belum ada pelepasan beban.</div>'; }
+  shedEv.forEach(function(e,k){
+    var fd = sim.feeders.find(function(x){return x.stage===e.stage;});
+    var bebanSblm = prev;
+    prev -= fd.mw;
+    el += '<div class="ev"><div class="n">'+(k+1)+'</div><div><div class="b">Tahap '+e.stage+' → Beban '+e.stage+'</div>'
+      +'<div class="s">−'+Math.round(fd.mw)+' MW @ t '+e.t.toFixed(2).replace('.',',')+' s · f '+e.f.toFixed(2).replace('.',',')+' Hz</div>'
+      +'<span class="t">beban '+fmt(Math.round(bebanSblm))+' → '+fmt(Math.round(prev))+' MW</span></div></div>';
+  });
+  document.getElementById('evList').innerHTML = el;
+  var tot=shedEv.reduce(function(a,e){var fd=sim.feeders.find(function(x){return x.stage===e.stage;}); return a+fd.mw;},0);
+  document.getElementById('rShed').textContent=fmt(Math.round(tot))+' MW';
+  // unit list status
+  st.o.gs.forEach(function(g){
+    document.getElementById('u'+g.id+'dot').className='st'+(g.online?'':' trip');
+    document.getElementById('u'+g.id+'st').textContent=g.online?'ONLINE':'TRIP';
+    document.getElementById('u'+g.id+'st').className=g.online?'':'st-open';
+  });
+  document.getElementById('stateBar').textContent = 'mode='+curScn+' t='+tNow.toFixed(2)+' f='+st.f.toFixed(2)+' beban='+Math.round(st.o.load)+' sup='+Math.round(st.o.sup)+' gov='+Math.round(st.o.gov)+' head='+Math.round(st.o.head)+' def='+Math.round(Math.max(0,st.o.load-(st.o.sup+st.o.imp)))+' lepas='+Math.round(tot)+' MW';
+}
+function drawAll(){ var st=stateAt(tNow); if(!st) return; renderSld(st); renderFreq(st); renderVolt(st); renderSide(st); }
+
+/* ── kontrol ── */
+function resetSim(){
+  running=false; tNow=0;
+  document.getElementById('playBtn').textContent='▶'; document.getElementById('playBtn').classList.remove('playing');
+  runSim(); updateScrub(); drawAll();
+}
+function updateScrub(){
+  var r=document.getElementById('scrub');
+  r.max=Math.round(TMAX*100);
+  r.value=Math.round(tNow*100);
+  document.getElementById('tVal').textContent=tNow.toFixed(2).replace('.',',')+' s';
+}
+function setScn(id){
+  curScn=id;
+  document.querySelectorAll('#scnChips button').forEach(function(b){b.classList.toggle('active', b.dataset.s===id);});
+  resetSim();
+}
+document.getElementById('scnChips').innerHTML = SCEN.map(function(s){return '<button data-s="'+s.id+'"'+(s.id===curScn?' class="active"':'')+'>'+s.label+'</button>';}).join('');
+document.querySelectorAll('#scnChips button').forEach(function(b){b.addEventListener('click',function(){setScn(b.dataset.s);});});
+document.getElementById('runBtn').addEventListener('click',function(){ resetSim(); running=true; var pb=document.getElementById('playBtn'); pb.textContent='❚❚'; pb.classList.add('playing'); lastWall=performance.now(); tick(); });
+document.getElementById('resetBtn').addEventListener('click',function(){ resetSim(); });
+document.getElementById('playBtn').addEventListener('click',function(){ running=!running; this.textContent=running?'❚❚':'▶'; this.classList.toggle('playing',running); if(running){lastWall=performance.now();tick();} });
+document.querySelectorAll('#spdBox button').forEach(function(b){ b.addEventListener('click',function(){ speed=+b.dataset.s; document.querySelectorAll('#spdBox button').forEach(function(x){x.classList.toggle('active',x===b);}); }); });
+document.getElementById('scrub').addEventListener('input',function(){ running=false; var pb=document.getElementById('playBtn'); pb.textContent='▶'; pb.classList.remove('playing'); tNow=this.value/100; drawAll(); updateScrub(); });
+document.getElementById('impRange').addEventListener('input',function(){ document.getElementById('impVal').textContent=this.value+' MW'; resetSim(); });
+function tick(){
+  if(!running) return;
+  var now=performance.now();
+  var dtEng=(now-lastWall)/1000 * speed * 4;   // demo: 1× ⇒ 0,25 detik dinding per detik engineering
+  lastWall=now;
+  tNow=Math.min(TMAX, tNow+dtEng);
+  updateScrub(); drawAll();
+  if(tNow>=TMAX){ running=false; var pb=document.getElementById('playBtn'); pb.textContent='▶'; pb.classList.remove('playing'); return; }
+  requestAnimationFrame(tick);
+}
+/* tab kanan + collapse */
+document.querySelectorAll('.tabs .tab').forEach(function(btn){ btn.addEventListener('click',function(){
+  document.querySelectorAll('.tabs .tab').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  document.getElementById('tp1').classList.toggle('active', btn.dataset.tab==='1');
+  document.getElementById('tp2').classList.toggle('active', btn.dataset.tab==='2');
+});});
+document.querySelectorAll('.card-h').forEach(function(h){ h.addEventListener('click',function(){ h.parentElement.classList.toggle('collapsed'); }); });
+/* varian layout */
+var VDESC={a:'SLD → transport → grafik frekuensi (dengan indikator) → grafik tegangan; kartu status di kolom kanan penuh. Sesuai PRD §4.', b:'SLD & kartu status sejajar di atas; grafik frekuensi & tegangan SISI-KE-SISI di bawah — lebih pendek (hemat scroll), kurva lebih besar.'};
+function setVariant(v){
+  document.body.className = v === 'a' ? 'va' : (v === 'b' ? 'vb' : v);
+  document.querySelectorAll('.vsw button[data-v]').forEach(function(b){b.classList.toggle('active',b.dataset.v===v);});
+  document.getElementById('vDesc').textContent=VDESC[v];
+  var u=new URL(location.href); u.searchParams.set('v',v); history.replaceState(null,'',u);
+}
+document.querySelectorAll('.vsw button[data-v]').forEach(function(b){ b.addEventListener('click',function(){ setVariant(b.dataset.v); }); });
+var qv=new URLSearchParams(location.search).get('v');
+setVariant(qv==='b'?'b':'a');
+/* mulai */
+runSim(); updateScrub(); drawAll();
+</script>
+</body>
+</html>
