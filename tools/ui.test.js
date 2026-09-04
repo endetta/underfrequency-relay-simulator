@@ -149,5 +149,46 @@ check('status pill mengikuti playhead: skenario impor di t akhir → PELEPASAN B
   A.computeRun();
 });
 
+/* ===== M3: kartu kanan dua tab (renderSide) ===== */
+function sideP(over) {
+  const p = A.paramP();
+  if (over) Object.assign(p, over);
+  return p;
+}
+const impS = sideP({ importMw: 400, loadMw: 1500, scenario: { kind: 'importLoss' } });
+const impRunS = A.ufTimeline(JSON.parse(JSON.stringify(impS)));
+
+check('M3: tab Kondisi sistem menampilkan pill + f + ROCOF + beban + pembangkitan + governor + headroom + defisit', () => {
+  const h = A.renderSide(impS, impRunS, 0, 'kondisi');
+  ['Frekuensi', 'ROCOF awal', 'Beban sistem', 'Pembangkitan', 'Dukungan governor', 'Headroom tersisa', 'Defisit'].forEach(k => {
+    if (!h.includes(k)) throw new Error('field ' + k + ' hilang');
+  });
+  if (h.indexOf('SEIMBANG') === -1) throw new Error('t=0 harus SEIMBANG');
+});
+check('M3: pill status semantik — PELEPASAN BEBAN di t tengah & RUNTUH saat collapse', () => {
+  const mid = A.renderSide(impS, impRunS, 2.2, 'kondisi');
+  if (mid.indexOf('PELEPASAN BEBAN') === -1) throw new Error('t=2.2 harus PELEPASAN BEBAN');
+  if (mid.indexOf('st-pelepasan') === -1) throw new Error('kelas pill pelepasan');
+  const runC = A.ufTimeline(JSON.parse(JSON.stringify(sideP({ scenario: { kind: 'collapse', mw: 1000 } }))));
+  const c = A.renderSide(sideP({ scenario: { kind: 'collapse', mw: 1000 } }), runC, runC.tMax, 'kondisi');
+  if (c.indexOf('RUNTUH') === -1 || c.indexOf('st-runtuh') === -1) throw new Error('collapse harus RUNTUH + st-runtuh');
+});
+check('M3: tab Urutan pelepasan — baris tiap trip dgn −MW, t, f, beban before→after + total', () => {
+  const h = A.renderSide(impS, impRunS, impRunS.tMax, 'urutan');
+  if (h.indexOf('Belum ada pelepasan') !== -1) throw new Error('harus ada trip');
+  if (!h.includes('−75 MW') || !h.includes('−150 MW')) throw new Error('baris harus memuat −MW nyata');
+  if (!h.includes('beban 1500 → 1425')) throw new Error('beban sebelum→sesudah T1');
+  if (h.indexOf('Total lepas') === -1 || h.indexOf('225') === -1) throw new Error('total lepas 225 MW');
+});
+check('M3: tanpa trip → "Belum ada pelepasan"', () => {
+  const h = A.renderSide(sideP(), null, 0, 'urutan');
+  if (h.indexOf('Belum ada pelepasan') === -1) throw new Error('harus pesan kosong');
+});
+check('M3: renderSideInto mengisi #sidePh; tanpa duplikat kartu ringkasan', () => {
+  A.renderSideInto();
+  if (!ctx.els.sidePh || !ctx.els.sidePh.innerHTML) throw new Error('#sidePh harus terisi');
+  if (src.includes('.r-sum')) throw new Error('kartu ringkasan dot tidak dipakai');
+});
+
 console.log(`\n${passed} lulus, ${failed} gagal`);
 process.exit(failed ? 1 : 0);

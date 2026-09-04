@@ -133,7 +133,25 @@
   .side-card .tabs{display:flex;gap:6px;margin-bottom:12px;}
   .side-card .tabs button{flex:1;padding:7px 4px;border:1px solid var(--line);background:var(--surface);border-radius:7px;font-family:'Inter',sans-serif;font-size:11.5px;font-weight:500;color:var(--ink-soft);cursor:pointer;}
   .side-card .tabs button.active{background:var(--blue);border-color:var(--blue);color:#fff;}
-  .side-card .ph{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-soft);text-align:center;padding:48px 0;}
+  /* pill status semantik */
+  .pill{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;letter-spacing:-.01em;text-align:center;border-radius:10px;padding:10px 8px;margin-bottom:12px;}
+  .pill.st-seimbang{background:var(--green-soft);color:var(--green);}
+  .pill.st-defisit{background:var(--copper-soft);color:var(--copper-deep);}
+  .pill.st-pelepasan{background:var(--red-soft);color:var(--red);}
+  .pill.st-pemulihan{background:var(--green-soft);color:var(--green);}
+  .pill.st-runtuh{background:var(--red);color:#fff;}
+  .side-body{flex:1;min-height:0;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:11.5px;}
+  .side-body .rline{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:3.5px 0;border-bottom:1px dashed var(--line);}
+  .side-body .rline span{color:var(--ink-soft);font-family:'Inter',sans-serif;font-size:11px;}
+  .side-body .rline b{font-weight:600;color:var(--ink);text-align:right;}
+  .side-body .trow{display:flex;gap:9px;padding:7px 0;border-bottom:1px solid var(--line);}
+  .side-body .tno{flex:none;width:20px;height:20px;border-radius:50%;background:var(--red-soft);color:var(--red);font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center;}
+  .side-body .ttl{font-size:11.5px;color:var(--ink);}
+  .side-body .ttl b{color:var(--red);}
+  .side-body .tsub{font-size:10px;color:var(--ink-soft);margin-top:1px;}
+  .side-body .total{margin-top:10px;font-size:12px;text-align:right;}
+  .side-body .total b{color:var(--red);}
+  .side-body .none{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-soft);text-align:center;padding:34px 0;}
 
   /* ===== splash pembuka (seam Differential/Distance) ===== */
   #root{position:relative;}
@@ -292,7 +310,7 @@
         <button id="tabKondisi" class="active">Kondisi sistem</button>
         <button id="tabUrutan">Urutan pelepasan</button>
       </div>
-      <div class="ph" id="sidePh">Kartu status aktif di M3.</div>
+      <div class="side-body" id="sidePh"></div>
     </div>
 
   </div>
@@ -885,6 +903,74 @@ function fAt(run, t) {
   return fs[fs.length - 1];
 }
 
+/* ═══════════════ 13c. Renderer kartu kanan (murni, diuji tools/ui.test.js) ═══════════════
+   Dua tab (PRD §4 / rencana §5): 'kondisi' = status live; 'urutan' = daftar
+   pelepasan berurutan dgn MW nyata + beban sebelum/sesudah. Pill semantik
+   .st-seimbang/.st-defisit/.st-pelepasan/.st-pemulihan/.st-runtuh. */
+function renderSide(p, run, t, tab) {
+  var scn = p.scenario || { kind: 'none' };
+  var offline = {}, impLost = false, loadExtra = 0;
+  if (scn.kind === 'genLoss') offline[scn.target] = true;
+  else if (scn.kind === 'importLoss') impLost = true;
+  else if (scn.kind === 'loadStep') loadExtra = scn.mw || 0;
+  else if (scn.kind === 'collapse') { impLost = true; loadExtra = scn.mw || 1000; }
+  var f = 50, trips = [];
+  if (run) {
+    f = fAt(run, t);
+    trips = run.tripSeq.filter(function (x) { return x.t <= t + 1e-9; });
+  }
+  var shedTotal = trips.reduce(function (a, x) { return a + x.mw; }, 0);
+  var loadNow = p.loadMw + loadExtra - shedTotal;
+  var impNow = impLost ? 0 : p.importMw;
+  var gensEff = p.gens.map(function (g) {
+    return offline[g.id] ? Object.assign({}, g, { online: false }) : g;
+  });
+  var gov = ufGovernorAt(gensEff, f);
+  var deficit = loadNow - gov.sup - impNow;
+  var collapse = false;
+  if (run && run.collapse) {
+    for (var i = 0; i < run.fs.length; i++) {
+      if (run.fs[i] <= 47.0001) { collapse = t >= run.ts[i] - 1e-9; break; }
+    }
+  }
+  var status = ufStatus(f, { trips: trips.length, collapse: collapse });
+  var cls = { SEIMBANG: 'st-seimbang', DEFISIT: 'st-defisit', 'PELEPASAN BEBAN': 'st-pelepasan', PEMULIHAN: 'st-pemulihan', RUNTUH: 'st-runtuh' }[status] || 'st-defisit';
+  var h = '<div class="pill ' + cls + '">' + status + '</div>';
+
+  if (tab === 'urutan') {
+    if (!trips.length) {
+      h += '<div class="none">Belum ada pelepasan beban.</div>';
+    } else {
+      trips.forEach(function (tr, i) {
+        var fC = tr.fAt.toFixed(2).replace('.', ',');
+        var tC = tr.t.toFixed(2).replace('.', ',');
+        h += '<div class="trow"><div class="tno">' + (i + 1) + '</div>'
+          + '<div><div class="ttl">' + tr.stage + ' → lepas <b>−' + Math.round(tr.mw) + ' MW</b></div>'
+          + '<div class="tsub">t ' + tC + ' s · f ' + fC + ' Hz · beban ' + Math.round(tr.loadBefore) + ' → ' + Math.round(tr.loadAfter) + ' MW</div></div></div>';
+      });
+      h += '<div class="total">Total lepas: <b>' + Math.round(shedTotal) + ' MW</b></div>';
+    }
+    return h;
+  }
+
+  var rocof0 = (run && run.ev && run.ev.length) ? run.ev[0].rocof0 : 0;
+  var row = function (k, v) { return '<div class="rline"><span>' + k + '</span><b>' + v + '</b></div>'; };
+  h += row('Frekuensi', f.toFixed(2) + ' Hz');
+  h += row('ROCOF awal', (rocof0 < 0 ? '' : '+') + rocof0.toFixed(2) + ' Hz/s');
+  h += row('Beban sistem', Math.round(loadNow) + ' MW');
+  h += row('Pembangkitan', Math.round(gov.sup) + ' MW');
+  h += row('Dukungan governor', '+' + Math.round(gov.gov) + ' MW');
+  h += row('Headroom tersisa', Math.round(gov.head) + ' MW');
+  h += row('Defisit', (deficit <= 0 ? '' : '+') + deficit.toFixed(1) + ' MW');
+  return h;
+}
+
+function renderSideInto() {
+  var el = document.getElementById('sidePh');
+  if (!el) return;
+  el.innerHTML = renderSide(paramP(), S.run, S.ui.tNow, S.ui.sideTab);
+}
+
 /* ═══════════════ 14. Renderer transport & kartu ═══════════════ */
 function renderTransport() {
   var r = S.run;
@@ -959,6 +1045,7 @@ function render() {
   renderScenGroup();
   renderSldInto();
   renderCharts();
+  renderSideInto();
 }
 
 /* ═══════════════ 16. Binding kontrol ═══════════════ */
@@ -1089,6 +1176,7 @@ function setSideTab(tab) {
   var a = el('tabKondisi'), b = el('tabUrutan');
   if (a) a.className = tab === 'kondisi' ? 'active' : '';
   if (b) b.className = tab === 'urutan' ? 'active' : '';
+  renderSideInto();
 }
 
 /* ── main loop playback (rAF; 1 langkah = 0.05 s eng @1×) ── */
@@ -1107,6 +1195,7 @@ function tick() {
   if (r && S.ui.tNow >= r.tMax) { S.ui.tNow = r.tMax; S.ui.playing = false; }
   renderSldInto();
   renderCharts();
+  renderSideInto();
   renderTransport();
   if (S.ui.playing) requestAnimationFrame(tick);
 }
@@ -1142,6 +1231,8 @@ var API = {
   render: render,
   renderSld: renderSld,
   renderSldInto: renderSldInto,
+  renderSide: renderSide,
+  renderSideInto: renderSideInto,
   renderFreq: renderFreq,
   renderGauge: renderGauge,
   renderVolt: renderVolt,
