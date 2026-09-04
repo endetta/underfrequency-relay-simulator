@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulator Underfrequency Relay</title>
+</head>
+<body>
+<!-- UI menyusul (M1+): SLD, grafik, kartu, transport. M0 = mesin perhitungan. -->
+<div id="app"></div>
+<script>
+'use strict';
+/* ═══════════════════════════════════════════════════════════════════════
+   SIMULATOR UNDERFREQUENCY RELAY (ANSI 81U) — M0: mesin perhitungan
+   Rantai model: docs/PRD.md §5; detail integrasi: spesifikasi U01 §7–§8.
+   Semua fungsi di bawah MURNI (tanpa DOM); diuji via tools/*.test.js.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Helper ── */
+function nearlyEqual(a, b) { return Math.abs(a - b) < 1e-9; }
+function clamp1(v, lo, hi) { return Math.min(Math.max(v, lo), hi); }
+
+/* ── 2. Default & preset ── */
+var DEFAULT_GENS = [
+  { id: 'G1', label: 'G1 — Thermal 600 MW', mva: 700, h: 5.0, r: 0.05, poles: 2, p0: 500, govMax: 640, online: true },
+  { id: 'G2', label: 'G2 — Hydro 400 MW',   mva: 450, h: 4.0, r: 0.04, poles: 4, p0: 350, govMax: 430, online: true },
+  { id: 'G3', label: 'G3 — Gas 300 MW',     mva: 330, h: 4.5, r: 0.05, poles: 2, p0: 250, govMax: 320, online: true }
+];
+var DEFAULT_STAGES = [
+  { id: 'T1', thr: 49.50, delay: 0.20, pct: 0.05 },
+  { id: 'T2', thr: 49.00, delay: 0.30, pct: 0.10 },
+  { id: 'T3', thr: 48.50, delay: 0.40, pct: 0.15 },
+  { id: 'T4', thr: 48.00, delay: 0.50, pct: 0.20 }
+];
+var PRESETS = {
+  mandiri: { label: 'Sistem mandiri',          gens: DEFAULT_GENS, loadMw: 1100, importMw: 0 },
+  berimpor:{ label: 'Dengan impor 400 MW',     gens: DEFAULT_GENS, loadMw: 1500, importMw: 400 }
+};
+var SCENARIOS = [
+  { id: 'none',     label: 'Seimbang (tanpa peristiwa)',           kind: 'none' },
+  { id: 'g1',       label: 'Lepas G1',                             kind: 'genLoss', target: 'G1' },
+  { id: 'g3',       label: 'Lepas G3',                             kind: 'genLoss', target: 'G3' },
+  { id: 'imp',      label: 'Lepas interkoneksi',                   kind: 'importLoss' },
+  { id: 'load200',  label: '+ Beban 200 MW',                       kind: 'loadStep', mw: 200 },
+  { id: 'runtuh',   label: '+ Beban besar (runtuh)',               kind: 'collapse', mw: 1000 }
+];
+
+/* MW nyata feeder per tahap = pct × beban pra-gangguan (PRD §3, kejujuran feeder). */
+function ufFeederMw(stages, baseLoad) {
+  var m = {};
+  stages.forEach(function (s) { m[s.id] = Math.round((s.pct || 0) * baseLoad); });
+  return m;
+}
+
+/* ── 3. Agregat (himpunan ONLINE) — PRD §5.2 / U01 §12.1 ── */
+function ufAggregates(gens) {
+  var sBase = 0, hSum = 0, pGen0 = 0, beta = 0, res = 0;
+  gens.forEach(function (g) {
+    if (!g.online) return;
+    sBase += g.mva;
+    hSum += g.mva * g.h;
+    pGen0 += g.p0;
+    beta += g.mva / g.r;
+    res += Math.max(0, g.govMax - g.p0);
+  });
+  return { sBase: sBase, hSys: sBase > 0 ? hSum / sBase : 0, pGen0: pGen0, betaPu: beta, reserve: res };
+}
+
+/* ── 4. Governor / droop — PRD §5.4 / U01 §7 ── */
+function satDevOf(g) { // Δf_i,sat (negatif); headroom ≤ 0 ⇒ jenuh sejak Δf=0
+  var hr = Math.max(0, g.govMax - g.p0);
+  if (hr <= 0) return 0;
+  return -50 * hr * g.r / g.mva;
+}
+function respAt(g, f) { // MW; Δf = f − 50
+  var dF = f - 50;
+  var raw = -dF / 50 * g.mva / g.r;
+  return clamp1(raw, 0, Math.max(0, g.govMax - g.p0));
+}
+function ufGovernorAt(gens, f) {
+  var resp = {}, sup = 0, gov = 0, head = 0;
+  gens.forEach(function (g) {
+    if (!g.online) { resp[g.id] = 0; return; }
+    var r = respAt(g, f);
+    resp[g.id] = r;
+    sup += g.p0 + r;
+    gov += r;
+    head += Math.max(0, g.govMax - g.p0) - r;
+  });
+  return { resp: resp, sup: sup, gov: gov, head: head };
+}
+
+/* ── 5. Solver keadaan mantap (piecewise, saturasi → COLLAPSE) — U01 §7.5 ── */
+function solveSteadyState(gens, D) { // D MW defisit net konstan (>0 = pembangkitan kurang)
+  var units = gens.filter(function (g) {
+    return g.online && g.govMax > g.p0;
+  }).map(function (g) {
+    return { id: g.id, mva: g.mva, r: g.r, hr: g.govMax - g.p0, sat: satDevOf(g) };
+  }).sort(function (a, b) { return b.sat - a.sat; }); // saturasi pertama = sat paling dekat 0
+  var beta = units.reduce(function (s, u) { return s + u.mva / u.r; }, 0);
+  var satHr = 0, idx = 0;
+  if (beta <= 1e-12) return { status: 'COLLAPSE', fSs: null, betaEff: 0 };
+  var df = -50 * D / beta;
+  while (idx < units.length) {
+    var u = units[idx];
+    if (df >= u.sat - 1e-12) break;            // unit ini belum jenuh pada Δf ini
+    beta -= u.mva / u.r;                        // jenuh: keluar dari β
+    satHr += u.hr;
+    idx++;
+    var Dn = D - satHr;
+    if (beta <= 1e-12) {
+      if (Dn > 1e-9) return { status: 'COLLAPSE', fSs: null, betaEff: 0 };
+      df = 0; break;
+    }
+    df = -50 * Dn / beta;
+  }
+  return { status: 'SETTLED', fSs: 50 + df, betaEff: beta, saturatedHr: satHr };
+}
+
+/* ── 6. ROCOF awal — PRD §5.5 / U01 §12.2 ── */
+function initialRocof(gens, D0) {
+  var a = ufAggregates(gens);
+  if (a.sBase <= 0 || a.hSys <= 0) return NaN;
+  return -(50 / (2 * a.hSys)) * (D0 / a.sBase);
+}
+
+/* ── 7. Validasi parameter — PRD §5 / U01 §12.6–12.7 ── */
+function ufValidate(P) {
+  var issues = [];
+  if (!P || typeof P.fNom !== 'number' || !(P.fNom > 0)) issues.push({ code: 'INVALID_PARAM', msg: 'fNominalHz harus > 0' });
+  if (!P || !(P.loadMw >= 0)) issues.push({ code: 'INVALID_PARAM', msg: 'beban harus >= 0' });
+  if (!P || !(P.importMw >= 0)) issues.push({ code: 'INVALID_PARAM', msg: 'impor harus >= 0' });
+  (P && P.gens || []).forEach(function (g) {
+    if (!(g.h > 0)) issues.push({ code: 'INVALID_PARAM', msg: 'H ' + g.id + ' harus > 0' });
+    if (!(g.r > 0)) issues.push({ code: 'INVALID_PARAM', msg: 'R ' + g.id + ' harus > 0' });
+    if (!(g.mva > 0)) issues.push({ code: 'INVALID_PARAM', msg: 'MVA ' + g.id + ' harus > 0' });
+    if (!(g.poles > 0)) issues.push({ code: 'INVALID_PARAM', msg: 'kutub ' + g.id + ' harus > 0' });
+  });
+  var sts = (P && P.stages || []).slice();
+  for (var i = 1; i < sts.length; i++) {
+    if (sts[i].thr >= sts[i - 1].thr) {
+      issues.push({ code: 'INVALID_UFLS_ORDER', msg: 'tahap harus urut ambang menurun' });
+      break;
+    }
+  }
+  return issues;
+}
+
+/* ── 8. Status sistem — PRD §5.9 ── */
+function ufStatus(f, info) {
+  var F0 = (info && info.fNom) || 50;
+  var band = (info && info.band) || 0.2;
+  if (info && info.collapse) return 'RUNTUH';
+  var trips = (info && info.trips) || 0;
+  if (trips > 0) return f < F0 - band ? 'PELEPASAN BEBAN' : 'PEMULIHAN';
+  return f < F0 - band ? 'DEFISIT' : 'SEIMBANG';
+}
+
+/* ── 9. Evaluator statis (kunci parity) — PRD §5.6 / U01 §13.1 ── */
+function ufEvaluateStatic(P) {
+  var gens = P.gens.map(function (g) { return Object.assign({}, g); });
+  var load = P.loadMw, imp = P.importMw || 0;
+  var scn = P.scenario || { kind: 'none' };
+  if (scn.kind === 'genLoss') { var g = gens.find(function (x) { return x.id === scn.target; }); if (g) g.online = false; }
+  else if (scn.kind === 'importLoss') { imp = 0; }
+  else if (scn.kind === 'loadStep') { load += scn.mw || 0; }
+  else if (scn.kind === 'block') { var g2 = gens.find(function (x) { return x.id === scn.target; }); if (g2) g2.govMax = Math.min(g2.govMax, scn.mw !== undefined ? scn.mw : g2.p0); }
+  else if (scn.kind === 'collapse') { imp = 0; load += scn.mw || 1000; }
+  var a0 = ufAggregates(gens);
+  var D0 = load - a0.pGen0 - imp;
+  var baseLoad = P.loadMw;
+  var sheds = ufFeederMw(P.stages, baseLoad);
+  var operated = [], totalShed = 0, D = D0;
+  for (var i = 0; i < 16; i++) {
+    var r = solveSteadyState(gens, D);
+    if (r.status === 'COLLAPSE') {
+      var st = P.stages.filter(function (s) { return operated.indexOf(s.id) < 0; })
+        .sort(function (a, b) { return b.thr - a.thr; })[0];
+      if (!st) return { status: 'COLLAPSE', steadyStateHz: null, initialRocofHzPerSec: initialRocof(gens, D0), totalShed: totalShed, operated: operated, initialDeficitMw: D0 };
+      var mw = sheds[st.id] !== undefined ? sheds[st.id] : Math.round(baseLoad * st.pct);
+      D -= mw; operated.push(st.id); totalShed += mw;
+      continue;
+    }
+    var fs = r.fSs;
+    var next = P.stages.filter(function (s) { return operated.indexOf(s.id) < 0 && s.thr > fs; })
+      .sort(function (a, b) { return b.thr - a.thr; });
+    if (next.length) {
+      next.forEach(function (s) { var m = sheds[s.id] !== undefined ? sheds[s.id] : Math.round(baseLoad * s.pct); D -= m; operated.push(s.id); totalShed += m; });
+      continue;
+    }
+    return {
+      status: 'SETTLED', steadyStateHz: fs, initialRocofHzPerSec: initialRocof(gens, D0),
+      totalShed: totalShed, operated: operated, initialDeficitMw: D0,
+      governorResponseMw: (function () { var o = {}; gens.forEach(function (g) { if (!g.online) { o[g.id] = 0; return; } var hr = g.govMax - g.p0; o[g.id] = hr > 0 ? clamp1(-(fs - 50) / 50 * g.mva / g.r, 0, hr) : 0; }); return o; })()
+    };
+  }
+  var r2 = solveSteadyState(gens, D);
+  return { status: 'SETTLED', steadyStateHz: r2.fSs, totalShed: totalShed, operated: operated, initialRocofHzPerSec: initialRocof(gens, D0), initialDeficitMw: D0 };
+}
+
+/* ── 10. Timeline event-driven (deterministik) — PRD §5.5–5.8 / U01 §8 ── */
+function ufTimeline(P) {
+  var F0 = P.fNom || 50;
+  var TMAX = P.tMax || 20;
+  var TEV = P.tEvent || 1.0;
+  var gens = P.gens.map(function (g) { return Object.assign({}, g); });
+  var stages = P.stages.map(function (s) { return { id: s.id, thr: s.thr, delay: s.delay, pct: s.pct, latched: false, timer: 0 }; });
+  var load = P.loadMw, imp = P.importMw || 0;
+  var baseLoad = load;
+  var sheds = ufFeederMw(stages, baseLoad);
+  var scn = P.scenario || { kind: 'none' };
+  var t = 0, f = F0, V = 1.0, prevF = f;
+  var ts = [], fs = [], vs = [], ev = [], tripSeq = [];
+  var collapse = false, settled = false, arrAt = -1, dip = 0, pendingEvent = scn.kind !== 'none';
+
+  function byId(id) { for (var i = 0; i < gens.length; i++) if (gens[i].id === id) return gens[i]; return null; }
+  function pushSamples() { ts.push(t); fs.push(f); vs.push(V); }
+
+  function applyEvent() {
+    var txt = '';
+    if (scn.kind === 'genLoss') { var g = byId(scn.target); if (g) { g.online = false; txt = 'Peristiwa: lepas ' + g.id + ' (' + Math.round(g.p0) + ' MW)'; } }
+    else if (scn.kind === 'importLoss') { imp = 0; txt = 'Peristiwa: lepas interkoneksi'; }
+    else if (scn.kind === 'loadStep') { load += scn.mw || 0; txt = 'Peristiwa: tambah beban ' + (scn.mw || 0) + ' MW'; }
+    else if (scn.kind === 'block') { var g2 = byId(scn.target); if (g2) { g2.govMax = Math.min(g2.govMax, scn.mw !== undefined ? scn.mw : g2.p0); txt = 'Peristiwa: blok ' + g2.id + ' (governor max ' + Math.round(g2.govMax) + ' MW)'; } }
+    else if (scn.kind === 'collapse') { imp = 0; load += scn.mw || 1000; txt = 'Peristiwa: lepas interkoneksi + beban besar'; }
+    var a = ufAggregates(gens);
+    var D0 = load - a.pGen0 - imp;
+    dip = Math.min(0.15, 0.5 * D0 / (a.sBase || 1));
+    ev.push({ t: t, kind: 'event', txt: txt, rocof0: initialRocof(gens, D0), d0: D0 });
+  }
+
+  function seg() { // parameter segmen utk f saat ini (set jenuh mengikuti f)
+    var a = ufAggregates(gens);
+    var H = a.hSys || 1, S = a.sBase || 1;
+    var beta = 0, satHr = 0;
+    gens.forEach(function (g) {
+      if (!g.online) return;
+      var hr = g.govMax - g.p0;
+      if (hr <= 0) return;
+      var sat = F0 + satDevOf(g);
+      if (f < sat) { satHr += hr; } else { beta += g.mva / g.r; }
+    });
+    var Deff = load - a.pGen0 - imp - satHr;
+    var K = beta / (2 * H * S);
+    var dfss = K > 1e-12 ? -F0 * Deff / beta : 0;
+    return { beta: beta, satHr: satHr, Deff: Deff, K: K, fss: F0 + dfss, H: H, S: S };
+  }
+  function dslope(s) { return -(F0 / (2 * s.H * s.S)) * s.Deff; }
+  function solveCross(f0, ft, s) { // τ > 0 saat f mencapai ft dalam segmen ini (dua arah)
+    if (s.K > 1e-12) {
+      var den = f0 - s.fss;
+      if (Math.abs(den) < 1e-12) return -1;
+      var r = (ft - s.fss) / den;
+      if (r <= 0) return -1;
+      var tau = -Math.log(r) / s.K;
+      return tau > 1e-9 ? tau : -1;
+    }
+    var m = dslope(s);
+    if (Math.abs(m) < 1e-12) return -1;
+    var tau2 = (f0 - ft) / m;
+    return tau2 > 1e-9 ? tau2 : -1;
+  }
+
+  pushSamples();
+  var iter = 0;
+  while (iter++ < 6000 && t < TMAX) {
+    if (pendingEvent && t >= TEV - 1e-9) { pendingEvent = false; applyEvent(); }
+    var s = seg();
+    var dts = [];
+    if (pendingEvent && t < TEV) dts.push(TEV - t);
+    gens.forEach(function (g) {
+      if (!g.online || g.govMax <= g.p0) return;
+      var sat = F0 + satDevOf(g);
+      if (Math.abs(f - sat) > 1e-9) { var d = solveCross(f, sat, s); if (d > 0) dts.push(d); }
+    });
+    stages.forEach(function (st) {
+      if (st.latched) return;
+      if (Math.abs(f - st.thr) > 1e-9) { var d = solveCross(f, st.thr, s); if (d > 0) dts.push(d); }
+      if (st.timer > 0 && f < st.thr && !nearlyEqual(f, st.thr)) dts.push(st.delay - st.timer);
+    });
+    if (f > 47.0) { var dm = solveCross(f, 47.0, s); if (dm > 0) dts.push(dm); }
+    var dt = Math.min(0.05, (dts.length ? Math.min.apply(null, dts) : 0.05));
+    if (!(dt > 0)) dt = 0.0005;
+    prevF = f;
+    f = s.K > 1e-12 ? s.fss + (f - s.fss) * Math.exp(-s.K * dt) : f + dslope(s) * dt;
+    t += dt;
+    if (f < 47.0) { f = 47.0; }
+    var tripped = false;
+    stages.forEach(function (st) {
+      if (st.latched) return;
+      if (f < st.thr && !nearlyEqual(f, st.thr)) st.timer += dt; else st.timer = 0;
+      if (st.timer >= st.delay) {
+        st.latched = true; st.timer = 0; tripped = true;
+        var mw = sheds[st.id] !== undefined ? sheds[st.id] : Math.round(baseLoad * st.pct);
+        var before = load; load -= mw;
+        ev.push({ t: t, kind: 'trip', stage: st.id, mw: mw, fAt: f });
+        tripSeq.push({ stage: st.id, t: t, fAt: f, mw: mw, loadBefore: before, loadAfter: load });
+      }
+    });
+    // tegangan ilustratif (PRD §5.8)
+    if (ev.length) {
+      if (collapse) { V = Math.max(0.85, V - 0.02); }
+      else if (arrAt < 0 && f > prevF) { arrAt = t; V = 1 - dip * Math.exp(-(t - arrAt) / 3); }
+      else if (arrAt < 0) { V = 1 - dip * (1 - Math.exp(-(t - TEV) / 0.2)); if (V < 0.85) V = 0.85; }
+      else { V = 1 - dip * Math.exp(-(t - arrAt) / 3); if (V < 0.85) V = 0.85; }
+    }
+    pushSamples();
+    if (s.K > 1e-12 && Math.abs(f - s.fss) < 1e-7 && !pendingEvent && stages.every(function (st) { return st.timer === 0; })) {
+      f = s.fss; settled = true; break;
+    }
+    if (f <= 47.0 + 1e-9) {
+      var still = seg().Deff > 1e-6;
+      var canShed = stages.some(function (st) { return !st.latched && st.thr > f + 1e-9; });
+      if (still && !canShed) { collapse = true; break; }
+    }
+  }
+  if (!settled && !collapse) {
+    var s2 = seg();
+    if (s2.K > 1e-12 && Math.abs(f - s2.fss) < 1e-4) { f = s2.fss; }
+  }
+  var finalStatus = collapse ? 'RUNTUH' : ufStatus(f, { trips: tripSeq.length, fNom: F0 });
+  return {
+    tMax: t, finalF: f, finalV: V, collapse: collapse, settled: settled,
+    status: finalStatus, ts: ts, fs: fs, vs: vs, ev: ev, tripSeq: tripSeq,
+    totalShed: tripSeq.reduce(function (a, x) { return a + x.mw; }, 0),
+    finalDeficit: seg().Deff
+  };
+}
+
+/* ── 11. Registry ekspor (satu-sumber-kebenaran utk tes; harness menambah __pub) ── */
+var API = {
+  render: function () {},                 // UI menyusul (M1+)
+  nearlyEqual: nearlyEqual,
+  ufAggregates: ufAggregates,
+  satDevOf: satDevOf,
+  respAt: respAt,
+  ufGovernorAt: ufGovernorAt,
+  solveSteadyState: solveSteadyState,
+  initialRocof: initialRocof,
+  ufValidate: ufValidate,
+  ufStatus: ufStatus,
+  ufEvaluateStatic: ufEvaluateStatic,
+  ufTimeline: ufTimeline,
+  ufFeederMw: ufFeederMw,
+  DEFAULT_GENS: DEFAULT_GENS,
+  DEFAULT_STAGES: DEFAULT_STAGES,
+  PRESETS: PRESETS,
+  SCENARIOS: SCENARIOS
+};
+</script>
+</body>
+</html>
