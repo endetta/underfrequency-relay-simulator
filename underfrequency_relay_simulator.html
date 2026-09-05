@@ -890,7 +890,30 @@ function paramP() { // P untuk mesin murni (skenario + fNom/tMax/tEvent + AGC)
     agcOn: S.param.agcOn, agcRate: S.param.agcRate, agcInterval: S.param.agcInterval
   };
 }
-function computeRun() { S.run = ufTimeline(paramP()); if (S.ui.tNow > S.run.tMax) S.ui.tNow = 0; }
+/* ═══════════════ 12a. sim — fasilitas run (K2 arsitektur) ═══════════════
+   Satu pintu (param → run): cache + ANTI-STALE via fingerprint paramP().
+   sim.run() menghitung ulang hanya bila param berubah (kelas bug M7/M8: "run
+   basi" & playhead lewat ujung run) dan menulis S.run (mirror utk pembaca
+   lama). Jalur baca render/tick/komit lewat sim — jangan panggil ufTimeline/
+   paramP langsung di handler UI. */
+var sim = {
+  _fp: null, _run: null,
+  run: function () {
+    var fp = JSON.stringify(paramP());
+    if (this._run && fp === this._fp) return this._run;
+    this._fp = fp;
+    this._run = ufTimeline(JSON.parse(fp));
+    if (S.ui.tNow > this._run.tMax) S.ui.tNow = 0; // clamp playhead (M8)
+    S.run = this._run;
+    return this._run;
+  },
+  p: function () { return this._fp ? JSON.parse(this._fp) : paramP(); },
+  restart: function () {
+    S.ui.playing = false; S.ui.tNow = 0;
+    return this.run();
+  }
+};
+function computeRun() { return sim.run(); } // delegasi kompat (tes lama / reset)
 
 /* ═══════════════ 12b. Snapshot keadaan sesaat — SATU-SATUNYA interpretasi presentasi ═══════════════
    (p, run, t) → satu objek polos {f, status, phase, collapse, trips, shedTotal,
@@ -1360,6 +1383,7 @@ function renderSldInto() {
   }
 }
 function render() {
+  sim.run(); // K2: pastikan run segar (anti-stale) sebelum menggambar — handler cukup ubah param lalu render()
   renderTransport();
   renderGenList();
   renderStageList();
@@ -1400,7 +1424,7 @@ function bind() {
     renderSldInto(); renderCharts(); renderSideInto(); renderTransport();
   });
   if (el('resetBtn')) el('resetBtn').addEventListener('click', function () {
-    S.ui.playing = false; S.ui.tNow = 0; computeRun(); render();
+    sim.restart(); render();
   });
   var spds = document.querySelectorAll('#spdGroup button');
   for (var j = 0; j < spds.length; j++) {
@@ -1425,7 +1449,7 @@ function bind() {
     if (sc && sc.kind === 'importLoss' && S.param.presetId !== 'berimpor') applyPreset('berimpor');
     if (sc && sc.kind === 'loadStep') sc = { kind: 'loadStep', mw: S.ui.loadStepMw }; // beban [MW] (PRD §4.2)
     S.param.scenario = clone(sc || { kind: 'none' });
-    S.ui.playing = false; S.ui.tNow = 0; computeRun(); render();
+    sim.restart(); render();
     play(); // auto-play (plan-03 P0 §0b): klik skenario → langsung jalan
   });
   // delegasi toggle AGC (kontainer #agcGroup statis — tombol dibangun ulang di render)
@@ -1437,11 +1461,11 @@ function bind() {
   });
   if (el('presetSel')) el('presetSel').addEventListener('change', function (e) {
     applyPreset(e.target.value);
-    S.ui.playing = false; S.ui.tNow = 0; computeRun(); render();
+    sim.restart(); render();
   });
   if (el('impSlider')) el('impSlider').addEventListener('input', function (e) {
     S.param.importMw = parseFloat(e.target.value) || 0;
-    S.ui.playing = false; S.ui.tNow = 0; computeRun(); render();
+    sim.restart(); render();
   });
   // beban tambahan [MW] (PRD §4.2) — ubah label chip; saat skenario loadStep aktif, recompute run
   if (el('loadStepSlider')) el('loadStepSlider').addEventListener('input', function (e) {
@@ -1449,7 +1473,7 @@ function bind() {
     var lv = el('loadStepV'); if (lv) lv.textContent = S.ui.loadStepMw + ' MW';
     if (S.param.scenario.kind === 'loadStep') {
       S.param.scenario.mw = S.ui.loadStepMw;
-      computeRun(); render();
+      render(); // render() → sim.run() mendeteksi perubahan param (K2)
     } else {
       renderScenGroup();
     }
@@ -1568,7 +1592,7 @@ function play() {
   renderTransport();
 }
 function togglePlay() {
-  if (!S.run) computeRun();
+  if (!S.run) sim.run();
   if (S.run && S.ui.tNow >= S.run.tMax - 1e-9) S.ui.tNow = 0;
   if (!S.ui.playing) { play(); return; }
   S.ui.playing = false;
@@ -1649,7 +1673,7 @@ setTimeout(fitSld, 350);
 function setAgc(on) {
   S.param.agcOn = !!on;
   renderAgcCtl();
-  S.ui.playing = false; S.ui.tNow = 0; computeRun(); render();
+  sim.restart(); render();
 }
 
 /* ═══════════════ 17. Registry ekspor (satu-sumber-kebenaran utk tes) ═══════════════ */
@@ -1692,6 +1716,7 @@ var API = {
   S: S,
   paramP: paramP,
   computeRun: computeRun,
+  sim: sim,
   toggleCard: toggleCard,
   setAllCollapsed: setAllCollapsed,
   syncCollapsedCentering: syncCollapsedCentering,
@@ -1705,7 +1730,7 @@ var API = {
 };
 
 /* inisialisasi */
-computeRun();
+sim.run(); // K2: S.run siap sebelum applyPreset (yg mengubah param → render() di bawah menghitung ulang)
 applyPreset(S.param.presetId); // sinkronkan select/slider/label ke param (plan-03 P0)
 bind();
 syncCollapseDom();

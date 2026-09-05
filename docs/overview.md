@@ -77,10 +77,11 @@ node tools/sld.test.js       # 24 asersi geometri SLD (gen atas / beban bawah / 
 node tools/charts.test.js    # 19 asersi skala grafik/gauge/tegangan (incl. M10 adaptif tinggi)
 node tools/ui.test.js        # 34 asersi seam desain & perilaku (incl. spasi transport↔SLD, M10 flex)
 node tools/snapshot.test.js  # 8 asersi snapshot keadaan sesaat (numerik lintas-permukaan)
+node tools/sim.test.js       # 6 asersi fasilitas run sim (cache, anti-stale, clamp playhead)
 node tools/shoot.js          # screenshot 9 view → tools/shots/ (+ zoom ASCII SLD)
 ```
 
-Total **139 asersi**, semuanya hijau di Node ≥ 22 (tanpa dependensi). `tools/shoot.js`
+Total **145 asersi**, semuanya hijau di Node ≥ 22 (tanpa dependensi). `tools/shoot.js`
 mengikuti pola CDP tanpa-npm proyek Differential (Chrome otomatis / `CHROME=/path`).
 
 ## Sumber & keputusan

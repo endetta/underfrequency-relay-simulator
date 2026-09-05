@@ -8,7 +8,8 @@
 > ADR-0006), M7 temuan code-review (skenario lengkap PRD), M8 bug play + rombak
 > SLD, M9 audit overlap SLD, M10 grafik mengisi kolom tengah (renderer adaptif
 > dims — lihat §5), lalu refactor arsitektur: modul `snapshot` keadaan sesaat
-> (§12b — lihat baris tabel §4). Rencana & log rinci: `design-plans/`.
+> (§12b) dan fasilitas run `sim` (§12a — keduanya lihat baris tabel §4). Rencana
+> & log rinci: `design-plans/`.
 > Kontrak model tetap PRD §5.
 > **Sumber masukan:** `docs/PRD.md` (§5 = sumber kebenaran model), `docs/adr/0001–0006`,
 > `CONTEXT.md`, `docs/research/pln-underfrequency-practice.md`, `prototype.html`
@@ -89,6 +90,7 @@ hasil review sudah masuk §2).
 | `ufStatus(m, f, shedInfo)` | 5 status + warna semantik (SEIMBANG/DEFISIT/PELEPASAN BEBAN/PEMULIHAN/RUNTUH). |
 | `ufTimeline(m)` | Menjalankan rantai penuh → `{ts[], fs[], vs[], out[], ev[]}` + `tripSeq` (urutan pelepasan + beban akhir). Satu-satunya penulis data run. |
 | `snapshot(p, run, t)` | Modul presentasi dalam (§12b): interpretasi SATU-SATUNYA dari (param, run, t) → `{f, status, phase, collapse, trips, shedTotal, loadNow, impNow, impLost, deficit, agcDisp, rocof0, gov, gen[]}` (state unit via `satDevOf`, `mwFinal`, `agcMw`). Konsumen: `renderSld`, `renderSide`, tag `#sldTag` — jangan menghitung ulang di renderer. Diuji `tools/snapshot.test.js`. |
+| `sim` (fasilitas run) | Satu pintu param → run (§12a): `sim.p()` assembler P, `sim.run()` cache + fingerprint param (deteksi perubahan → recompute + clamp playhead bila run menyusut), `sim.restart()` reset playhead + run segar. Kelas bug "run basi" (M7/M8) mengerucut di sini; handler cukup ubah param → `render()` (yang melewati `sim.run()`). Diuji `tools/sim.test.js`. |
 | `ufPresets` | 2 preset (Mandiri / Berimpor 400 MW) + 8 chip skenario peristiwa (Seimbang, Lepas G1/G2/G3, Lepas interkoneksi, +Beban [MW] — dipakai slider `loadStep`, Blok G3, +Beban besar→runtuh); semua `plnVerificationRequired:true`. |
 | `SL`-style modul tahap? | Tidak perlu — `ufParam` cukup (tidak ada slope dinamis di sini). |
 

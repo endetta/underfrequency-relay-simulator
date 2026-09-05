@@ -53,11 +53,12 @@ node tools/sld.test.js       # geometri SLD
 node tools/charts.test.js    # skala grafik/gauge/tegangan
 node tools/ui.test.js        # seam desain & perilaku UI
 node tools/snapshot.test.js  # snapshot keadaan sesaat (numerik, lintas-permukaan)
+node tools/sim.test.js       # fasilitas run sim (cache, anti-stale, clamp playhead)
 node tools/shoot.js          # screenshot semua view → tools/shots/
 ```
 
-139 asersi, hijau di Node ≥ 22 (tanpa dependensi) — model 33 · timeline 21 · sld 24 ·
-charts 19 · ui 34 · snapshot 8. Detail: `docs/overview.md`, `docs/PRD.md` (model),
+145 asersi, hijau di Node ≥ 22 (tanpa dependensi) — model 33 · timeline 21 · sld 24 ·
+charts 19 · ui 34 · snapshot 8 · sim 6. Detail: `docs/overview.md`, `docs/PRD.md` (model),
 `docs/implementation-plan.md` (kontrak).
 
 ## Catatan

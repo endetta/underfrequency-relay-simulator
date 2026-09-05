@@ -99,6 +99,14 @@ kumulatif. Satu-satunya sumber interpretasi untuk SLD, tag status, dan kartu kan
 (modul `snapshot(p, run, t)`); renderer TIDAK menghitung ulang turunan ini.
 _Avoid_: derived state, presentation state
 
+**Fasilitas run (sim)** :
+Satu pintu param → run: `sim.p()` (assembler P), `sim.run()` (cache + deteksi
+perubahan via fingerprint param + clamp playhead saat run menyusut),
+`sim.restart()` (reset playhead + run segar). Kelas bug M7/M8 ("run basi")
+mengerucut di sini — renderer/handler cukup mengubah param lalu memanggil
+`render()`, yang selalu melewati `sim.run()` sehingga run tak pernah basi.
+_Avoid_: facade, state manager, store
+
 **Diagram satu garis (SLD)** :
 Kanvas utama simulator: unit pembangkit → bus → feeder beban dengan pemutus;
 menampilkan status & aliran daya secara langsung.
