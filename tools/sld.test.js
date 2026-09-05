@@ -268,14 +268,24 @@ check('F2: baris MW chip font 10 (floor >= 10), tanpa font 11', () => {
 });
 
 /* ── F3 (plan-06): komposisi vertikal — blok impor turun, band gen naik, void ≤ 40 ── */
-check('F3: blok interkoneksi turun (y=48) — label id gen y=112, chip y=100, AGC y=86', () => {
+check('F3: blok interkoneksi turun (y=48) — label id gen y=112, chip y=100, AGC y=84 h=15 (M12-A)', () => {
   const s = renderAt(baseP, baseRun, 0);
   if (!s.includes('x="60" y="48" width="110" height="34"')) throw new Error('blok interkoneksi harus di y=48 (F3)');
   if (count(s, 'y="112"') !== 3) throw new Error('3 label id gen harus di y=112 (F3), dapat ' + count(s, 'y="112"'));
   const t1 = agcRun.agcSteps[0].t;
   const sAgc = renderAt(agcP, agcRun, t1 + 0.05);
   if (count(sAgc, 'class="agctag"') !== 3) throw new Error('3 label AGC dibutuhkan');
-  if (!sAgc.includes('y="86"')) throw new Error('AGC tag harus di y=86 (F3)');
+  if (!sAgc.includes('y="84" width="32" height="15"')) throw new Error('AGC tag harus y=84 h=15 (teks muat penuh), dapat: ' + (sAgc.match(/<rect class="agctag"[^>]*>/) || [''])[0]);
+  if (sAgc.includes('y="86" width="32" height="13"')) throw new Error('AGC tag 86×13 (teks meluber 0,7 px) harus dihapus (M12-A)');
+});
+check('M12-B: garis impor MENYENTUH CB (y2=254) — pola sentuh-simpul seragam', () => {
+  const s = renderAt(baseP, baseRun, 0);
+  if (!s.includes('<line class="imp" x1="115" y1="82" x2="115" y2="254"')) throw new Error('garis impor harus y2=254 (sentuh CB), dapat: ' + (s.match(/<line class="imp"[^>]*>/) || [''])[0]);
+  if (s.includes('y2="252"')) throw new Error('gap 2 px impor (y2=252) harus hilang (M12-B)');
+});
+check('M12-C: label Beban margin kanan konsisten — x=668 (sejajar tepi chip G3, margin 32 px)', () => {
+  const s = renderAt(baseP, baseRun, 0);
+  if (!s.includes('<text x="668" y="486" text-anchor="end"')) throw new Error('label Beban harus x=668 (margin kanan 32 px), dapat: ' + (s.match(/<text x="[0-9]+" y="486" text-anchor="end"[^>]*>/) || [''])[0]);
 });
 check('F3: void vertikal impor→gen <= 40 px (void 90 px lama hilang)', () => {
   const s = renderAt(baseP, baseRun, 0);
