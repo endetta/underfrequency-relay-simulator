@@ -65,6 +65,29 @@ check('Seimbang: f tetap 50, tanpa trip, SEIMBANG, settled, AGC idle', () => {
   if (r.agcDispatch !== 0 || r.agcStep !== 0) throw new Error('AGC harus idle saat seimbang');
   approx(r.finalV, 1, 1e-12, 'finalV');
 });
+check('BUG play: run Seimbang membentang ke jendela 0–30 s (bukan berhenti di t≈0,05 s)', () => {
+  const r = A.ufTimeline(P({ scenario: { kind: 'none' }, tMax: 30 }));
+  approx(r.tMax, 30, 1e-9, 'tMax harus jendela penuh 30 s');
+  if (r.ts.length < 100) throw new Error('harus disampel sepanjang jendela, dapat ' + r.ts.length);
+  approx(r.ts[r.ts.length - 1], 30, 1e-9, 'sampel terakhir t=30');
+  r.fs.forEach(f => { if (Math.abs(f - 50) > 1e-9) throw new Error('f harus tetap 50: ' + f); });
+  if (!r.settled) throw new Error('harus settled');
+  if (r.tripSeq.length !== 0) throw new Error('tak boleh ada trip');
+});
+check('BUG play: run berperistiwa juga membentang sampai jendela 30 s setelah settled', () => {
+  const r = A.ufTimeline(P({ scenario: { kind: 'genLoss', target: 'G3' }, tMax: 30 }));
+  approx(r.tMax, 30, 1e-9, 'tMax harus 30, dapat ' + r.tMax);
+  if (!r.settled) throw new Error('harus settled');
+  approx(r.finalF, 50, 1e-6, 'finalF');
+});
+check('BUG play: run RUNTUH juga disampling sampai ujung jendela (f terpaku 47, V lantai 0,85)', () => {
+  const r = A.ufTimeline(P({ scenario: { kind: 'collapse', mw: 1000 }, tMax: 30 }));
+  if (!r.collapse) throw new Error('harus collapse');
+  approx(r.tMax, 30, 1e-9, 'tMax harus 30, dapat ' + r.tMax);
+  approx(r.ts[r.ts.length - 1], 30, 1e-9, 'sampel terakhir t=30');
+  approx(r.finalF, 47, 1e-9, 'f terpaku 47');
+  approx(r.finalV, 0.85, 0.001, 'V lantai 0,85');
+});
 
 /* ── Lapisan AGC: skenario ringan +Beban 200 (plan-03: showcase governor → AGC,
    tanpa UFLS). Droop saja: f_ss 49.686 DEFISIT; AGC memulihkan → 50.00 SEIMBANG. */

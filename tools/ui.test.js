@@ -75,6 +75,13 @@ check('transport KOMPAK: tinggi CSS ≤ 44 px', () => {
   const min = Math.min(...heights);
   if (min > 44) throw new Error('transport harus ≤ 44 px, dapat ' + min);
 });
+check('M8: spacing transport ↔ kartu SLD — .transport margin-top ≥ 10 px (sebelumnya nempel)', () => {
+  const rules = [...src.matchAll(/\.transport\s*\{([^}]*)\}/g)];
+  const withMt = rules.map(m => (m[1].match(/margin-top:(\d+(?:\.\d+)?)px/) || [])[1]).filter(Boolean).map(parseFloat);
+  if (!withMt.length) throw new Error('.transport harus punya margin-top (spasi dengan SLD card)');
+  const max = Math.max(...withMt);
+  if (max < 10) throw new Error('margin-top harus ≥ 10 px, dapat ' + max);
+});
 check('transport: tombol play/kecepatan/scrub/reset + baca t', () => {
   contains(src, 'id="playBtn"', 'play');
   contains(src, 'id="spdGroup"', 'kecepatan');

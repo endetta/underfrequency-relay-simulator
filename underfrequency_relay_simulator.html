@@ -146,7 +146,7 @@
 
   /* ===== transport kompak (satu baris ramping, tinggi ≤ 40 px) ===== */
   .transport{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);
-    border-radius:12px;padding:5px 12px;height:40px;min-width:0;}
+    border-radius:12px;padding:5px 12px;height:40px;min-width:0;margin-top:10px;}
   .transport .tb{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--ink-soft);white-space:nowrap;}
   .transport .tb b{color:var(--ink);font-weight:600;}
   .transport input[type=range]{flex:1;min-width:60px;}
@@ -785,6 +785,8 @@ function ufTimeline(P) {
     if (f > 47.0) { var dm = solveCross(f, 47.0, s); if (dm > 0) dts.push(dm); }
     var dt = Math.min(0.05, (dts.length ? Math.min.apply(null, dts) : 0.05));
     if (!(dt > 0)) dt = 0.0005;
+    if (t + dt > TMAX) dt = TMAX - t; // jepit langkah terakhir tepat di ujung jendela
+    if (!(dt > 0)) dt = 0;
     prevF = f;
     f = s.K > 1e-12 ? s.fss + (f - s.fss) * Math.exp(-s.K * dt) : f + dslope(s) * dt;
     t += dt;
@@ -811,18 +813,21 @@ function ufTimeline(P) {
       else { V = 1 - dip * Math.exp(-(t - arrAt) / 3); if (V < 0.85) V = 0.85; }
     }
     pushSamples();
-    // Henti-dini hanya saat sistem tenang (tak ada timer UFLS) dan tak ada lagi
-    // aksi AGC terjadwal (AGC OFF / f sudah di pita / reserve habis).
+    // JANGAN henti-dini: run TETAP disampling sampai ujung jendela TMAX agar
+    // play berjalan penuh 0–30 s. BUG play (M8): break saat settled/collapse
+    // membuat run Seimbang berakhir di t≈0,05 s → tombol ▶ langsung berhenti.
+    // Di sini cukup tandai settled (f diam di fss) / collapse (f terpaku 47,
+    // V meluruh ke lantai 0,85) dan lanjutkan sampling datar ke TMAX.
     var inBand = f >= F0 - AGC_BAND;
     var noTimers = stages.every(function (st) { return st.timer === 0; });
     var agcDone = !AGC_ON || !agcStillNeeded();
     if (s.K > 1e-12 && Math.abs(f - s.fss) < 1e-7 && !pendingEvent && noTimers && agcDone) {
-      f = s.fss; settled = true; break;
+      f = s.fss; settled = true;
     }
     if (f <= 47.0 + 1e-9) {
       var still = seg().Deff > 1e-6;
       var canShed = stages.some(function (st) { return !st.latched && st.thr > f + 1e-9; });
-      if (still && !canShed) { collapse = true; break; }
+      if (still && !canShed) { collapse = true; }
     }
   }
   if (!settled && !collapse) {
@@ -909,35 +914,33 @@ function renderSld(p, t, run) {
   }
   var out = [];
 
-  /* ── bus (y=260, plan-02 §4.3) ── */
+  /* ── bus (y=260, plan-02 §4.3) — M8: generator DI ATAS, beban DI BAWAH ── */
   out.push('<line class="bus" x1="70" y1="260" x2="590" y2="260" stroke="var(--ink)" stroke-width="7" stroke-linecap="round"/>');
-  out.push('<text x="690" y="250" text-anchor="end" font-size="11.5" font-family="JetBrains Mono,monospace" font-weight="600" fill="var(--ink-soft)">Beban '
-    + loadNow + ' MW' + (shedTotal ? ' · lepas ' + shedTotal : '') + '</text>');
 
   /* ── interkoneksi (kiri-atas) ── */
   var impMw = impLost ? 0 : p.importMw;
   var impTxt = impLost ? '0 MW · LEPAS' : impMw + ' MW';
   var impCol = impLost ? 'var(--red)' : 'var(--blue)';
   var impBg  = impLost ? 'var(--red-soft)' : 'var(--blue-soft)';
-  out.push('<rect class="imp" x="60" y="150" width="110" height="34" rx="7" fill="' + impBg + '" stroke="' + impCol + '"/>');
-  out.push('<text x="115" y="164" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" letter-spacing=".06em" fill="var(--ink-soft)">INTERKONEKSI</text>');
-  out.push('<text x="115" y="178" text-anchor="middle" font-size="12" font-weight="600" font-family="JetBrains Mono,monospace" fill="' + impCol + '">' + impTxt + '</text>');
-  out.push('<line class="imp" x1="115" y1="184" x2="115" y2="252" stroke="var(--ink)" stroke-width="3"/>');
-  out.push('<rect class="brk" data-open="' + (impLost ? 1 : 0) + '" x="111" y="252" width="8" height="8" fill="' + (impLost ? 'var(--red-soft)' : 'var(--surface)') + '" stroke="' + (impLost ? 'var(--red)' : 'var(--ink)') + '" stroke-width="1.5"'
-    + (impLost ? ' transform="rotate(45 115 256)"' : '') + '/>');
+  out.push('<rect class="imp" x="60" y="24" width="110" height="34" rx="7" fill="' + impBg + '" stroke="' + impCol + '"/>');
+  out.push('<text x="115" y="38" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" letter-spacing=".06em" fill="var(--ink-soft)">INTERKONEKSI</text>');
+  out.push('<text x="115" y="52" text-anchor="middle" font-size="12" font-weight="600" font-family="JetBrains Mono,monospace" fill="' + impCol + '">' + impTxt + '</text>');
+  out.push('<line class="imp" x1="115" y1="58" x2="115" y2="252" stroke="var(--ink)" stroke-width="3"/>');
+  out.push('<rect class="brk" data-open="' + (impLost ? 1 : 0) + '" x="109" y="254" width="12" height="12" fill="' + (impLost ? 'var(--red-soft)' : 'var(--surface)') + '" stroke="' + (impLost ? 'var(--red)' : 'var(--ink)') + '" stroke-width="1.5"'
+    + (impLost ? ' transform="rotate(45 115 260)"' : '') + '/>');
   if (impLost) out.push('<text class="openlab" x="115" y="246" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" fill="var(--red)" paint-order="stroke" stroke="var(--surface)" stroke-width="3">TERBUKA</text>');
 
-  /* ── generator (bawah bus): lingkaran + salib (×) + chip SAMPING RPM/MW ── */
+  /* ── generator (ATAS bus): lingkaran + salib (×) + chip SAMPING RPM/MW ── */
   var gx = [170, 350, 530];
   eff.forEach(function (g, i) {
     var x = gx[i];
     var isOff = offline[g.id] === true;
-    out.push('<line x1="' + x + '" y1="260" x2="' + x + '" y2="300" stroke="var(--ink)" stroke-width="3"/>');
-    out.push('<circle class="gen" cx="' + x + '" cy="322" r="22" fill="var(--surface)" stroke="' + (isOff ? 'var(--off)' : 'var(--ink)') + '" stroke-width="2"/>');
+    out.push('<line x1="' + x + '" y1="260" x2="' + x + '" y2="192" stroke="var(--ink)" stroke-width="3"/>');
+    out.push('<circle class="gen" cx="' + x + '" cy="170" r="22" fill="var(--surface)" stroke="' + (isOff ? 'var(--off)' : 'var(--ink)') + '" stroke-width="2"/>');
     // salib × (simbol generator standar)
-    out.push('<line class="xc" x1="' + (x - 15) + '" y1="307" x2="' + (x + 15) + '" y2="337" stroke="' + (isOff ? 'var(--off)' : 'var(--ink)') + '" stroke-width="2"/>');
-    out.push('<line class="xc" x1="' + (x - 15) + '" y1="337" x2="' + (x + 15) + '" y2="307" stroke="' + (isOff ? 'var(--off)' : 'var(--ink)') + '" stroke-width="2"/>');
-    out.push('<text x="' + x + '" y="364" text-anchor="middle" font-size="12" font-family="Space Grotesk,sans-serif" font-weight="600" fill="var(--ink)">' + g.id + '</text>');
+    out.push('<line class="xc" x1="' + (x - 15) + '" y1="155" x2="' + (x + 15) + '" y2="185" stroke="' + (isOff ? 'var(--off)' : 'var(--ink)') + '" stroke-width="2"/>');
+    out.push('<line class="xc" x1="' + (x - 15) + '" y1="185" x2="' + (x + 15) + '" y2="155" stroke="' + (isOff ? 'var(--off)' : 'var(--ink)') + '" stroke-width="2"/>');
+    out.push('<text x="' + x + '" y="140" text-anchor="middle" font-size="12" font-family="Space Grotesk,sans-serif" font-weight="600" fill="var(--ink)">' + g.id + '</text>');
     // chip samping kanan: status + RPM + MW (droop + setpoint AGC; cap di govMax)
     var rpm = isOff ? 0 : Math.round(120 * f / g.poles); // n = 120·f/P (P = kutub)
     var mw = isOff ? 0 : g.p0 + gov.resp[g.id] + (agcCum[g.id] || 0);
@@ -946,18 +949,18 @@ function renderSld(p, t, run) {
     var chipBg = isOff ? 'var(--bg)' : (sat ? 'var(--copper-soft)' : 'var(--green-soft)');
     var chipBd = isOff ? 'var(--off)' : (sat ? 'var(--copper)' : 'var(--green)');
     var cx = x + 93; // pusat chip
-    out.push('<rect class="chip" cx-chip="' + x + '" x="' + (x + 34) + '" y="296" width="118" height="44" rx="7" fill="' + chipBg + '" stroke="' + chipBd + '"/>');
-    out.push('<text x="' + cx + '" y="315" text-anchor="middle" font-size="12" font-weight="600" font-family="JetBrains Mono,monospace" fill="var(--ink)">' + (isOff ? 'TRIP' : 'RPM ' + rpm) + '</text>');
-    out.push('<text class="chipmw" x="' + cx + '" y="331" text-anchor="middle" font-size="11" font-family="JetBrains Mono,monospace" fill="' + (isOff ? 'var(--off)' : (sat ? 'var(--copper-deep)' : 'var(--green)')) + '">'
+    out.push('<rect class="chip" cx-chip="' + x + '" x="' + (x + 34) + '" y="148" width="118" height="44" rx="7" fill="' + chipBg + '" stroke="' + chipBd + '"/>');
+    out.push('<text x="' + cx + '" y="167" text-anchor="middle" font-size="12" font-weight="600" font-family="JetBrains Mono,monospace" fill="var(--ink)">' + (isOff ? 'TRIP' : 'RPM ' + rpm) + '</text>');
+    out.push('<text class="chipmw" x="' + cx + '" y="183" text-anchor="middle" font-size="11" font-family="JetBrains Mono,monospace" fill="' + (isOff ? 'var(--off)' : (sat ? 'var(--copper-deep)' : 'var(--green)')) + '">'
       + (isOff ? '0 MW' : (sat ? Math.round(mw) + ' MW · maks gov' : Math.round(mw) + ' MW')) + '</text>');
     // label kecil AGC (plan-03 P3): unit yang menerima setpoint kendali sekunder
     if (!isOff && (agcCum[g.id] || 0) > 0.5) {
-      out.push('<rect class="agctag" x="' + (cx - 16) + '" y="282" width="32" height="13" rx="4" fill="var(--copper-soft)" stroke="var(--copper)" stroke-width="1"/>');
-      out.push('<text x="' + cx + '" y="291.5" text-anchor="middle" font-size="10" font-weight="600" font-family="JetBrains Mono,monospace" fill="var(--copper-deep)">AGC</text>');
+      out.push('<rect class="agctag" x="' + (cx - 16) + '" y="134" width="32" height="13" rx="4" fill="var(--copper-soft)" stroke="var(--copper)" stroke-width="1"/>');
+      out.push('<text x="' + cx + '" y="143.5" text-anchor="middle" font-size="10" font-weight="600" font-family="JetBrains Mono,monospace" fill="var(--copper-deep)">AGC</text>');
     }
   });
 
-  /* ── feeder beban (atas bus): T1–T4 hijau + VITAL teal, garis solid ── */
+  /* ── feeder beban (BAWAH bus, M8): T1–T4 hijau + VITAL teal, label DUA BARIS ── */
   var fx = [120, 225, 330, 435, 540];
   var fed = stages.map(function (s) { return { id: s.id, mw: Math.round((s.pct || 0) * p.loadMw) }; });
   fed.push({ id: 'V', mw: Math.round(p.loadMw * 0.5), vital: true });
@@ -966,19 +969,26 @@ function renderSld(p, t, run) {
     var isOpen = open[fd.id] !== undefined;
     var col = fd.vital ? 'var(--teal)' : 'var(--green)';
     var bg  = fd.vital ? 'var(--teal-soft)' : 'var(--green-soft)';
-    var txt = fd.vital ? 'VITAL · ' + fd.mw + ' MW' : fd.id + ' · ' + fd.mw + ' MW';
-    out.push('<line x1="' + x + '" y1="72" x2="' + x + '" y2="252" stroke="' + col + '" stroke-width="3"/>');
-    out.push('<rect class="brk" data-open="' + (isOpen ? 1 : 0) + '" x="' + (x - 4) + '" y="244" width="8" height="8" fill="' + (isOpen ? 'var(--red-soft)' : 'var(--surface)') + '" stroke="' + (isOpen ? 'var(--red)' : 'var(--ink)') + '" stroke-width="1.5"'
-      + (isOpen ? ' transform="rotate(45 ' + x + ' 248)"' : '') + '/>');
-    if (isOpen) out.push('<text class="openlab" x="' + x + '" y="238" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" fill="var(--red)" paint-order="stroke" stroke="var(--surface)" stroke-width="3">TERBUKA</text>');
-    // panah aliran saat tertutup
+    var idTxt = fd.vital ? 'VITAL' : fd.id;
+    out.push('<line x1="' + x + '" y1="260" x2="' + x + '" y2="392" stroke="' + col + '" stroke-width="3"/>');
+    out.push('<rect class="brk" data-open="' + (isOpen ? 1 : 0) + '" x="' + (x - 6) + '" y="268" width="12" height="12" fill="' + (isOpen ? 'var(--red-soft)' : 'var(--surface)') + '" stroke="' + (isOpen ? 'var(--red)' : 'var(--ink)') + '" stroke-width="1.5"'
+      + (isOpen ? ' transform="rotate(45 ' + x + ' 274)"' : '') + '/>');
+    if (isOpen) out.push('<text class="openlab" x="' + x + '" y="298" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" fill="var(--red)" paint-order="stroke" stroke="var(--surface)" stroke-width="3">TERBUKA</text>');
+    // panah aliran saat tertutup (arah bus → beban, ke bawah)
     if (!isOpen) {
-      out.push('<path class="flow" d="M ' + (x - 4) + ' 150 l 8 0 l -4 -7 z" fill="' + col + '"/>');
-      out.push('<path class="flow" d="M ' + (x - 4) + ' 185 l 8 0 l -4 -7 z" fill="' + col + '"/>');
+      out.push('<path class="flow" d="M ' + (x - 4) + ' 330 l 8 0 l -4 7 z" fill="' + col + '"/>');
+      out.push('<path class="flow" d="M ' + (x - 4) + ' 365 l 8 0 l -4 7 z" fill="' + col + '"/>');
     }
-    out.push('<rect x="' + (x - 55) + '" y="36" width="110" height="36" rx="7" fill="' + bg + '" stroke="' + col + '"/>');
-    out.push('<text x="' + x + '" y="58" text-anchor="middle" font-size="11" font-family="JetBrains Mono,monospace" font-weight="600" fill="' + (fd.vital ? 'var(--teal)' : 'var(--green)') + '">' + txt + '</text>');
+    // M9: kotak 96 lebar @ pitch 105 → celah 9 antar kotak (sebelumnya 110 →
+    // saling tumpuk 5 px & sudut membulat terpotong). Tepi strip 72–588 sejajar bus 70–590.
+    out.push('<rect x="' + (x - 48) + '" y="400" width="96" height="52" rx="7" fill="' + bg + '" stroke="' + col + '"/>');
+    out.push('<text x="' + x + '" y="422" text-anchor="middle" font-size="11" font-family="JetBrains Mono,monospace" font-weight="600" fill="' + (fd.vital ? 'var(--teal)' : 'var(--green)') + '">' + idTxt + '</text>');
+    out.push('<text x="' + x + '" y="440" text-anchor="middle" font-size="10.5" font-family="JetBrains Mono,monospace" fill="' + (fd.vital ? 'var(--teal)' : 'var(--green)') + '">' + fd.mw + ' MW</text>');
   });
+
+  /* ── ringkasan beban (di bawah kotak feeder, kanan) ── */
+  out.push('<text x="690" y="486" text-anchor="end" font-size="11.5" font-family="JetBrains Mono,monospace" font-weight="600" fill="var(--ink-soft)">Beban '
+    + loadNow + ' MW' + (shedTotal ? ' · lepas ' + shedTotal : '') + '</text>');
 
   return out.join('\n');
 }

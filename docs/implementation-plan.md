@@ -3,7 +3,12 @@
 > **Status:** SELESAI — seluruh milestone M0–M4 dikerjakan, diuji, dan di-push
 > ke `origin/main` (lihat riwayat commit; PRD §7 ditutup). Dokumen ini tetap
 > sebagai kontrak implementasi & catatan proses.
-> **Sumber masukan:** `docs/PRD.md` (§5 = sumber kebenaran model), `docs/adr/0001–0005`,
+> **Catatan (2026-09-05):** lanjutan M5–M9 juga selesai & ter-push — M5 rombak
+> layout satu layar (plan-02), M6 AGC + player real-time 0–30 s (plan-03 /
+> ADR-0006), M7 temuan code-review (skenario lengkap PRD), M8 bug play + rombak
+> SLD, M9 audit overlap SLD. Rencana & log rinci: `design-plans/`. Kontrak model
+> tetap PRD §5.
+> **Sumber masukan:** `docs/PRD.md` (§5 = sumber kebenaran model), `docs/adr/0001–0006`,
 > `CONTEXT.md`, `docs/research/pln-underfrequency-practice.md`, `prototype.html`
 > (disetujui dengan revisi, lihat §2), `tools/shoot-proto.js` (harness screenshot).
 > **Sasaran:** satu file `underfrequency_relay_simulator.html` vanilla (tanpa build,
@@ -81,7 +86,7 @@ hasil review sudah masuk §2).
 | `ufVoltage(m, run)` | Model ilustratif: lekukan `min(0,15, 0,5·D0/S)` saat peristiwa, turun τ≈0,2 s, pulih τ≈3 s setelah arrested, lantai 0,85 saat RUNTUH; label wajib. |
 | `ufStatus(m, f, shedInfo)` | 5 status + warna semantik (SEIMBANG/DEFISIT/PELEPASAN BEBAN/PEMULIHAN/RUNTUH). |
 | `ufTimeline(m)` | Menjalankan rantai penuh → `{ts[], fs[], vs[], out[], ev[]}` + `tripSeq` (urutan pelepasan + beban akhir). Satu-satunya penulis data run. |
-| `ufPresets` | 2 preset (Mandiri / Berimpor 400 MW) + 6 skenario peristiwa (Seimbang, Lepas G1/G3, Lepas interkoneksi, +Beban 200, +Beban besar→runtuh); semua `plnVerificationRequired:true`. |
+| `ufPresets` | 2 preset (Mandiri / Berimpor 400 MW) + 8 chip skenario peristiwa (Seimbang, Lepas G1/G2/G3, Lepas interkoneksi, +Beban [MW] — dipakai slider `loadStep`, Blok G3, +Beban besar→runtuh); semua `plnVerificationRequired:true`. |
 | `SL`-style modul tahap? | Tidak perlu — `ufParam` cukup (tidak ada slope dinamis di sini). |
 
 Konvensi keputusan (wajib): `M <= 1` no-pickup analog → **UFLS strict**
@@ -93,21 +98,26 @@ tunda habis; tahap yang trip **terkunci**; dasar fraksi = beban **pra-gangguan**
 - **Layout (varian A)**: grid `296px minmax(0,1fr) 336px`, area
   `params sld side / params tr side / params fch side / params vch side`;
   desktop lock ≥921×600 (hanya kolom yang scroll internal); ≤1240px = stack satu kolom.
-- **SLD** (spesifikasi revisi §2): bus tebal y=70; interkoneksi kiri-atas (kotak
-  label + pemutus); 3 generator simbol lingkaran+salib di bawah bus, chip RPM+MW
-  (hijau online / copper maks-gov / abu trip); feeder T1–T4 hijau + beban vital teal
-  tersambung solid; pemutus kotak (lurus/miring); legenda 5 item warna dibedakan.
+- **SLD** (spesifikasi revisi §2 + M8): bus tebal y=260; interkoneksi kiri-atas
+  (kotak label + pemutus); 3 generator simbol lingkaran+salib **di atas bus** (M8),
+  chip RPM+MW samping (hijau online / copper maks-gov / abu trip); feeder T1–T4
+  hijau + beban vital teal tersambung solid **di bawah bus**, label feeder **dua
+  baris** (id / MW — M8, tanpa overlap); kotak feeder **96 lebar @ pitch 105** —
+  celah 9 px, tanpa saling tumpuk (M9); pemutus kotak **12×12** (M8, sebelumnya
+  8×8; lurus/miring 45°); spasi transport ↔ kartu SLD 10 px (M8); legenda 5 item
+  warna dibedakan.
 - **Transport kompak**: satu baris ramping; ▶/❚❚, spd 0,5×/1×/2×, scrubber 0–30 s,
   `t` live, Reset.
 - **Grafik frekuensi**: y 47–52 Hz (grid 0,5 Hz + pita normal ±0,2 hijau lembut +
   garis 50 dipertegas), garis ambang putus-putus copper berlabel T1–T4, penanda
-  peristiwa & trip, x 0–12 s; **indikator batang gradien** hijau→merah 47–52 + penunjuk
-  + nilai (stops ramp final di M3).
+  peristiwa & trip, **x 0–30 s** (M6/ADR-0006); **indikator batang gradien**
+  hijau→copper→merah 47–52 + penunjuk + nilai (stops ramp final di M3/M5).
 - **Grafik tegangan**: pu 0,85–1,05, label permanen "ilustratif — bukan hasil aliran
   daya", kV di foot.
-- **Kartu kanan 2 tab**: `Kondisi sistem` (pill status, f, ROCOF, beban, pembangkitan,
-  dukungan governor, headroom, defisit) & `Urutan pelepasan` (minus MW, t, f saat trip,
-  beban akhir tiap tahap, total lepas). Kartu kiri: unit pembangkit, beban & tahap UFLS
+- **Kartu kanan 2 tab**: `Kondisi sistem` (pill status + fase kendali
+  governor/AGC/UFLS, f, ROCOF, beban, pembangkitan, dukungan governor, dukungan
+  AGC, headroom, defisit) & `Urutan pelepasan` (minus MW, t, f saat trip, beban
+  akhir tiap tahap, total lepas). Kartu kiri: unit pembangkit, beban & tahap UFLS
   (+ catatan ambar PLN), skenario, tentang.
 - **Interaksi**: play/pause (requestAnimationFrame, **waktu dinding real-time** —
   1× = 1 s engineering per 1 s nyata, ADR-0006/plan-03, bukan 0,25 s), speed, scrub

@@ -38,6 +38,18 @@ langsung di browser atau `python -m http.server`.
   (`scenarioDelta`/`applyScenario`/`effGens` — 4 situs duplikat dihapus) + `collapseAt`
   (2 loop duplikat); warna renderer lewat **`var(--*)`** (var baru `--grid`/`--off`);
   dokumen basi disinkronkan (PRD §4.4, overview, implementation-plan §5).
+- **M8 (2026-09-05, bug play + rombak SLD)**: **BUG play** — run pendek (Seimbang
+  t≈0,05 s; berperistiwa ~14 s; RUNTUH) membuat ▶ langsung berhenti; `ufTimeline`
+  kini **disampling sampai ujung jendela TMAX** (f diam di fss / terpaku 47 saat
+  RUNTUH; `dt` dijepit ke ujung jendela). SLD dirombak: **generator DI ATAS bus,
+  beban DI BAWAH**; label feeder **dua baris** (id baris 1, MW baris 2 — tanpa
+  overlap); pemutus (CB) **12×12** (sebelumnya 8×8); spasi **transport ↔ kartu SLD**
+  (`margin-top:10px`). Log: `design-plans/sesi-2026-09-05-04-…`.
+- **M9 (2026-09-05, audit overlap SLD)**: temuan scan bounding-box Chrome (5 skenario)
+  — 5 kotak feeder 110 lebar @ pitch 105 **saling tumpuk 5 px** (sudut rx terpotong,
+  border bersilang); diperbaiki → kotak **96 lebar** (celah 9 px; strip 72–588 sejajar
+  bus 70–590). Tes M9 baru di sld.test (24 asersi). Log:
+  `design-plans/sesi-2026-09-05-05-…`.
 
 ## Aturan umum workspace — SELF-CONTAINED (tidak perlu membaca CLAUDE.md/AGENTS.md di luar folder ini)
 
@@ -82,7 +94,7 @@ jangan diedit tanpa izin. Bila ragu proyek mana yang dimaksud user: tanyakan.
   (template `design-plans/sesi-TEMPLATE.md`): waktu mulai + commit sebelum → kegiatan
   & hasil (ringkas, dgn bukti tes/angka) → status → langkah berikutnya. Perbarui juga
   status header `design-plans/plan-*.md` yang dipakai (DRAF → DIEKSEKUSI → SELESAI).
-- Riwayat terbaru: `sesi-2026-09-05-02` (eksekusi plan-03 M6: AGC + player real-time + jendela 30 s).
+- Riwayat terbaru: `sesi-2026-09-05-05` (M9: audit overlap SLD — kotak feeder tak lagi tumpuk) → `sesi-2026-09-05-04` (M8: bug play + rombak SLD) → `sesi-2026-09-05-03` (M7: temuan code-review) → `sesi-2026-09-05-02` (plan-03 M6: AGC + player real-time + jendela 30 s).
   Sebelumnya: `sesi-2026-09-05-01` (audit improve-ui → eksekusi M5, plan-02 SELESAI).
 - **Sesi/AI baru mulai dari:** file ini → log sesi terbaru → plan ber-status DRAF/BELUM
   → kerjakan lanjutannya. Riwayat & arah tersimpan di file — jangan eksplorasi ulang.

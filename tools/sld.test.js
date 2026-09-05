@@ -53,14 +53,17 @@ check('baseline: 6 pemutus lurus (1 impor + 5 feeder), tanpa rotasi, tanpa label
   if (s.includes('rotate(45')) throw new Error('tak boleh ada pemutus miring');
   if (s.includes('TERBUKA')) throw new Error('tak boleh ada label TERBUKA');
 });
-check('baseline: interkoneksi 400 MW berlabel, beban 1100 MW, vital teal tersambung ke bus', () => {
+check('baseline: interkoneksi 400 MW berlabel, beban 1100 MW, vital teal tersambung ke bus (dari atas)', () => {
   const s = renderAt(baseP, baseRun, 0);
   if (!s.includes('400 MW')) throw new Error('label impor harus 400 MW');
   if (!s.includes('Beban 1100 MW')) throw new Error('label beban harus 1100 MW');
-  if (!s.includes('VITAL · 550 MW')) throw new Error('label vital harus VITAL · 550 MW');
-  // garis vital (teal) harus benar-benar menempel ke bus: segmen dari bus ke atas (plan-02 §4.3)
-  if (!s.includes('x1="540" y1="72" x2="540" y2="252" stroke="var(--teal)"')) {
-    throw new Error('feeder vital harus tersambung solid ke bus dengan warna teal (var(--teal))');
+  // M8: label feeder DUA BARIS (tanpa overlap) — vital = 'VITAL' + '550 MW' terpisah
+  if (!s.includes('>VITAL<')) throw new Error('baris 1 vital harus berisi VITAL');
+  if (!s.includes('>550 MW<')) throw new Error('baris 2 vital harus berisi 550 MW');
+  if (s.includes('VITAL · 550 MW')) throw new Error('label satu baris "VITAL · 550 MW" harus dihapus (M8)');
+  // garis vital (teal) harus menempel bus dan turun ke kotak feeder (M8: beban di BAWAH bus)
+  if (!s.includes('x1="540" y1="260" x2="540" y2="392" stroke="var(--teal)"')) {
+    throw new Error('feeder vital harus tersambung solid dari bus ke bawah dengan warna teal (var(--teal))');
   }
   if (count(s, 'stroke="var(--teal)"') < 2) throw new Error('vital harus bergaris teal');
 });
@@ -80,7 +83,7 @@ check('lepas interkoneksi (t=1.3): pemutus impor miring 45° + label TERBUKA + 0
   const s = renderAt(impP, impRun, 1.3);
   if (!s.includes('0 MW · LEPAS')) throw new Error('label impor harus 0 MW · LEPAS');
   if (count(s, 'data-open="1"') !== 1) throw new Error('tepat 1 pemutus terbuka (impor)');
-  if (!s.includes('rotate(45 115 256)')) throw new Error('pemutus impor harus miring 45°');
+  if (!s.includes('rotate(45 115 260)')) throw new Error('pemutus impor harus miring 45° (M8: CB 12×12 di bus 260)');
   if (count(s, 'TERBUKA') !== 1) throw new Error('1 label TERBUKA');
   if (s.includes('stroke-dasharray')) throw new Error('tetap tanpa dasharray');
 });
@@ -131,6 +134,54 @@ check('Blok G3 (maks 100): chip G3 = 100 MW (output dijepit PRD §5.3), bukan 25
   const mws = [...s.matchAll(/class="chipmw"[^>]*>([^<]+)</g)].map(m => m[1]);
   if (mws.length !== 3) throw new Error('harus 3 chip MW, dapat ' + mws.length);
   if (mws[2] !== '100 MW') throw new Error('chip G3 harus 100 MW (terblok), dapat ' + mws[2]);
+});
+
+/* ── M8: rombak SLD per permintaan user — generator DI ATAS bus, beban DI BAWAH,
+   label feeder dua baris (tanpa overlap), pemutus lebih besar 12×12. ── */
+check('M8: generator di ATAS bus — lingkaran cy=170 (di atas bus 260), garis naik 260→192', () => {
+  const s = renderAt(baseP, baseRun, 0);
+  if (count(s, 'cy="170"') !== 3) throw new Error('3 lingkaran generator harus di atas bus (cy=170), dapat ' + count(s, 'cy="170"'));
+  if (count(s, 'y2="192"') !== 3) throw new Error('garis tiap generator harus naik dari bus (260) ke lingkaran (y2=192)');
+  if (s.includes('y2="300"')) throw new Error('generator TIDAK boleh lagi di bawah bus');
+});
+check('M8: beban di BAWAH bus — kotak feeder y=400, garis turun 260→392', () => {
+  const s = renderAt(baseP, baseRun, 0);
+  if (count(s, 'y="400"') !== 5) throw new Error('5 kotak feeder harus di bawah bus (y=400), dapat ' + count(s, 'y="400"'));
+  if (count(s, 'y2="392"') !== 5) throw new Error('garis tiap feeder harus turun dari bus (260) ke kotak (y2=392)');
+  if (s.includes('y="36"')) throw new Error('feeder TIDAK boleh lagi di atas bus');
+});
+check('M8: label feeder dua baris tanpa overlap — id di baris 1, MW di baris 2 (semua 1100 MW)', () => {
+  const s = renderAt(baseP, baseRun, 0);
+  ['T1', 'T2', 'T3', 'T4', 'VITAL'].forEach(id => {
+    if (!s.includes('>' + id + '<')) throw new Error('baris 1 harus berisi ' + id);
+  });
+  ['55 MW', '110 MW', '165 MW', '220 MW', '550 MW'].forEach(mw => {
+    if (!s.includes('>' + mw + '<')) throw new Error('baris 2 harus berisi ' + mw);
+  });
+  if (s.includes('T1 · 55 MW')) throw new Error('label satu baris "T1 · 55 MW" harus dihapus (M8)');
+});
+check('M9: kotak feeder TIDAK saling tumpuk — 5 kotak lebar 96 @ pitch 105 (celah 9)', () => {
+  const s = renderAt(baseP, baseRun, 0);
+  const xs = [...s.matchAll(/<rect x="([0-9]+)" y="400" width="96" height="52"/g)].map(m => parseInt(m[1], 10));
+  if (xs.length !== 5) throw new Error('harus 5 kotak feeder y=400 lebar 96, dapat ' + xs.length);
+  for (let i = 1; i < xs.length; i++) {
+    if (xs[i] - xs[i - 1] !== 105) throw new Error('pitch antar kotak harus 105, dapat ' + (xs[i] - xs[i - 1]));
+  }
+  if (s.includes('width="110" height="52"')) throw new Error('kotak lebar 110 (tumpuk 5 px) harus dihapus (M9)');
+});
+check('M8: pemutus (CB) lebih besar — 12×12 (sebelumnya 8×8), tetap 6 buah', () => {
+  const s = renderAt(baseP, baseRun, 0);
+  if (count(s, 'class="brk"') !== 6) throw new Error('tetap 6 pemutus (1 impor + 5 feeder)');
+  if (count(s, 'width="12" height="12"') !== 6) throw new Error('keenam CB harus 12×12, dapat ' + count(s, 'width="12" height="12"'));
+  if (s.includes('width="8" height="8"')) throw new Error('CB 8×8 lama harus dihapus (M8)');
+});
+check('M8: pita vertikal berurutan tanpa tumpuk — gen (≤192) < bus (260) < CB (268+) < kotak (400)', () => {
+  const s = renderAt(baseP, baseRun, 0);
+  // chip generator pindah ke atas (band 148–192), bukan lagi 296–340
+  if (s.includes('y="296"')) throw new Error('chip gen lama y=296 harus pindah ke atas (M8)');
+  if (s.includes('y="364"')) throw new Error('label id gen lama y=364 harus pindah ke atas (M8)');
+  // CB feeder tepat di bawah bus: y=268 (12×12 → 268–280)
+  if (count(s, 'y="268"') !== 5) throw new Error('5 CB feeder harus tepat di bawah bus (y=268)');
 });
 
 /* ── floor tipografi kanvas (plan-02 §4.4) ── */

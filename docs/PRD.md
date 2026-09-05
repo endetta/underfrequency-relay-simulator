@@ -4,7 +4,7 @@
 > **Bentuk produk:** satu file HTML vanilla mandiri (`underfrequency_relay_simulator.html`),
 > tanpa build, Bahasa Indonesia — saudara kandung proyek
 > `LEVEL 2 - DIFFERENTIAL RELAY SIMULATOR` & `LEVEL 2 - DISTANCE RELAY SIMULATOR`.
-> **Dokumen pendamping:** keputusan arsitektur di `docs/adr/` (0001–0005), riset PLN di
+> **Dokumen pendamping:** keputusan arsitektur di `docs/adr/` (0001–0006), riset PLN di
 > `docs/research/pln-underfrequency-practice.md`, terminologi baku di `CONTEXT.md`.
 > **Bagian 5 dokumen ini = sumber kebenaran model** — ubah rumus inti hanya bersama dokumen ini.
 
