@@ -50,6 +50,15 @@ langsung di browser atau `python -m http.server`.
   border bersilang); diperbaiki → kotak **96 lebar** (celah 9 px; strip 72–588 sejajar
   bus 70–590). Tes M9 baru di sld.test (24 asersi). Log:
   `design-plans/sesi-2026-09-05-05-…`.
+- **M10 (2026-09-05, grafik mengisi kolom)**: kartu grafik flex bertumpuk mengisi
+  **penuh tinggi kolom tengah** (sebelumnya void ±190–230 px @layar tinggi). Renderer
+  grafik kini menerima **dims `{w,h}`** (ukur `clientWidth/Height` → `viewBox`
+  dinamis → gambar **1:1 px**): `fToY(f,H)=12+(52−f)/5·(H−36)`, `tToX(t,W)=38+
+  t/30·(W−52)`, gauge & volt ikut (gauge `viewBox 74×H`; volt margin bawah 26).
+  `fToY/tToX` tanpa dims = kotak desain lama → literal suite charts M2 **tetap**;
+  `svgBox()` guard default saat tersembunyi/stub; re-render saat resize (`rg`
+  observe `#viewGraf`) & saat switch ke Grafik. Tes M10: charts 19 · ui 34 (total
+  131). Log: `design-plans/sesi-2026-09-05-06-…`.
 
 ## Aturan umum workspace — SELF-CONTAINED (tidak perlu membaca CLAUDE.md/AGENTS.md di luar folder ini)
 
@@ -94,7 +103,7 @@ jangan diedit tanpa izin. Bila ragu proyek mana yang dimaksud user: tanyakan.
   (template `design-plans/sesi-TEMPLATE.md`): waktu mulai + commit sebelum → kegiatan
   & hasil (ringkas, dgn bukti tes/angka) → status → langkah berikutnya. Perbarui juga
   status header `design-plans/plan-*.md` yang dipakai (DRAF → DIEKSEKUSI → SELESAI).
-- Riwayat terbaru: `sesi-2026-09-05-05` (M9: audit overlap SLD — kotak feeder tak lagi tumpuk) → `sesi-2026-09-05-04` (M8: bug play + rombak SLD) → `sesi-2026-09-05-03` (M7: temuan code-review) → `sesi-2026-09-05-02` (plan-03 M6: AGC + player real-time + jendela 30 s).
+- Riwayat terbaru: `sesi-2026-09-05-06` (M10: grafik mengisi kolom — renderer adaptif dims) → `sesi-2026-09-05-05` (M9: audit overlap SLD — kotak feeder tak lagi tumpuk) → `sesi-2026-09-05-04` (M8: bug play + rombak SLD) → `sesi-2026-09-05-03` (M7: temuan code-review) → `sesi-2026-09-05-02` (plan-03 M6: AGC + player real-time + jendela 30 s).
   Sebelumnya: `sesi-2026-09-05-01` (audit improve-ui → eksekusi M5, plan-02 SELESAI).
 - **Sesi/AI baru mulai dari:** file ini → log sesi terbaru → plan ber-status DRAF/BELUM
   → kerjakan lanjutannya. Riwayat & arah tersimpan di file — jangan eksplorasi ulang.
@@ -179,8 +188,10 @@ play/speed/scrub/reset, tab kanan, collapse). Tidak ada build.
 - `pct` tahap UFLS = **fraksi** (0,05), bukan persen (5) — konversi `× beban dasar`.
 - `tools/shots/` & `tools/.tmp-*/` gitignored (artefak).
 - Prototipe `prototype.html` hidup di branch `prototype-v1` (aturan skill prototype).
-- Konstanta skala grafik dikunci (PRD §7 + ADR-0006): `y(f)=12+(52−f)/5·214`,
-  `x(t)=38+t/30·628` (jendela 0–30 s); gauge stops (M5): 0/36/38/44/62/100%
+- Skala grafik: rumus `y(f)=12+(52−f)/5·214`, `x(t)=38+t/30·628` (jendela 0–30 s)
+  = **desain/nominal** kotak 680×250 (PRD §7) — literal suite charts; renderer M10
+  menerima dims `{w,h}` → plot mengisi tinggi kartu (`fToY(f,H)`, `tToX(t,W)`;
+  margin atas 12 / bawah 24, volt 26). Gauge stops (M5): 0/36/38/44/62/100%
   (copper/copper/hijau/hijau/copper/merah — hijau HANYA pita 50,2–49,8, over-frekuensi
   copper) — tes memakai literal.
 - **Player (M6)**: `tick()` memakai `S.ui.lastT/lastHeavy/heavyN` — jangan balik ke

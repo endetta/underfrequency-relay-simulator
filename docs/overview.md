@@ -29,7 +29,9 @@ sepenuhnya berdiri sendiri (ADR-0001).
 - **Grafik frekuensi** (0–30 s, 47–52 Hz): pita normal ±0,2 Hz hijau, garis 50 Hz,
   ambang UFLS putus-putus copper berlabel T1–T4, penanda peristiwa (t=1,0 s) & trip,
   nilai f di playhead; di sampingnya **indikator batang gradien** hijau→copper→merah
-  (50 Hz masih hijau, 47 Hz merah) + penunjuk + nilai.
+  (50 Hz masih hijau, 47 Hz merah) + penunjuk + nilai. **Kartu grafik mengisi penuh
+  tinggi kolom tengah (M10)** — tiap SVG diukur lalu digambar ulang 1:1 px (skala
+  vertikal menyesuaikan kartu), tanpa ruang kosong bawah saat layar tinggi.
 - **Grafik tegangan** (pu 0,85–1,05): label permanen *"ilustratif — bukan hasil
   aliran daya"*, lantai 0,85, nominal 20 kV.
 - **Kartu kanan 2 tab**: *Kondisi sistem* (pill status semantik + fase kendali
@@ -69,12 +71,12 @@ Peristiwa yang dipicu t=1,0 s: Lepas G1/G2/G3 · Blok G3 · Lepas interkoneksi
 node tools/model.test.js     # 33 asersi literal (U01 §12 + hitung tangan)
 node tools/timeline.test.js  # 21 asersi (determinisme, parity, RUNTUH, jendela 0–30 s)
 node tools/sld.test.js       # 24 asersi geometri SLD (gen atas / beban bawah / CB 12×12 / kotak tak tumpuk)
-node tools/charts.test.js    # 14 asersi skala grafik/gauge/tegangan
-node tools/ui.test.js        # 31 asersi seam desain & perilaku (incl. spasi transport↔SLD)
+node tools/charts.test.js    # 19 asersi skala grafik/gauge/tegangan (incl. M10 adaptif tinggi)
+node tools/ui.test.js        # 34 asersi seam desain & perilaku (incl. spasi transport↔SLD, M10 flex)
 node tools/shoot.js          # screenshot 9 view → tools/shots/ (+ zoom ASCII SLD)
 ```
 
-Total **123 asersi**, semuanya hijau di Node ≥ 22 (tanpa dependensi). `tools/shoot.js`
+Total **131 asersi**, semuanya hijau di Node ≥ 22 (tanpa dependensi). `tools/shoot.js`
 mengikuti pola CDP tanpa-npm proyek Differential (Chrome otomatis / `CHROME=/path`).
 
 ## Sumber & keputusan

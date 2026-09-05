@@ -54,8 +54,12 @@
   .view-sld .sld-title{flex:none;}
   .view-sld svg{flex:1;min-height:0;margin:auto;}
   .view-sld .legend{flex:none;}
-  .view-graf{display:flex;flex-direction:column;}
-  .view-graf .chart-card{margin-bottom:10px;}
+  /* M10: kartu grafik FLEX mengisi tinggi kolom tengah — svg digambar 1:1 px
+     ke kotak terukurnya (renderFreq/renderVolt/renderGauge + dims), jadi tak
+     ada void bawah saat layar tinggi; tanpa height:auto (terbatas aspek). */
+  .view-graf{display:flex;flex-direction:column;min-height:0;}
+  .view-graf .chart-card{flex:1 1 0;min-height:0;display:flex;flex-direction:column;margin-bottom:10px;}
+  .view-graf .chart-card:last-child{margin-bottom:0;}
 
   .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 15px;margin-bottom:14px;}
   .card-h{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;margin:0 0 12px;overflow:hidden;}
@@ -155,13 +159,17 @@
   .spd button.active{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600;}
 
   /* ===== kartu grafik (M2) & status (M3) — shell hadir sejak M1 ===== */
-  .chart-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-height:130px;}
-  .chart-card .frow{display:flex;gap:10px;align-items:stretch;}
-  .chart-card .frow svg{flex:1;min-width:0;display:block;}
-  .chart-card .gwrap{width:74px;flex:none;display:flex;align-items:stretch;}
-  .chart-card .gwrap svg{width:74px;display:block;}
-  .chart-card svg{display:block;max-width:100%;height:auto;}
-  .chart-card .clab{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-soft);margin-bottom:6px;}
+  .chart-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;}
+  .chart-card .clab{flex:none;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-soft);margin-bottom:6px;}
+  .chart-card .frow{flex:1;min-height:0;display:flex;gap:10px;align-items:stretch;}
+  .chart-card .frow svg{flex:1 1 auto;min-width:0;height:100%;display:block;}
+  .chart-card .gwrap{flex:none;width:74px;display:flex;align-items:stretch;}
+  .chart-card .gwrap svg{width:74px;height:100%;display:block;}
+  .chart-card.v svg{flex:1;min-height:0;width:100%;height:100%;display:block;}
+  @media(max-width:920px){
+    /* tumpuk: biarkan tinggi alami (aspect dari viewBox dinamis) */
+    .chart-card .frow svg,.chart-card.v svg,.chart-card .gwrap svg{height:auto;}
+  }
   .side-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;min-height:0;}
   .side-card .tabs{display:flex;gap:6px;margin-bottom:12px;}
   .side-card .tabs button{flex:1;padding:7px 4px;border:1px solid var(--line);background:var(--surface);border-radius:7px;font-family:'Inter',sans-serif;font-size:11.5px;font-weight:500;color:var(--ink-soft);cursor:pointer;}
@@ -994,71 +1002,82 @@ function renderSld(p, t, run) {
 }
 
 /* ═══════════════ 13b. Renderer grafik (murni, diuji tools/charts.test.js) ═══════════════
-   Skala literal: jendela waktu 0–30 s (plan-03 P1); frekuensi 47–52 Hz dengan
-   y(f) = 12 + (52−f)/5·214 dan x(t) = 38 + t/30·628. Kelas kunci utk tes:
-   .band (pita normal), .thr (ambang UFLS), .ev (peristiwa), .trip (trip),
-   .floor (lantai tegangan), .pt (penunjuk gauge). */
-function fToY(f) { return 12 + (52 - f) / 5 * 214; }
-function tToX(t) { return 38 + t / 30 * 628; }
+   Skala literal (kotak DESAIN, tanpa dims): jendela 0–30 s; frekuensi 47–52 Hz
+   dengan y(f) = 12 + (52−f)/5·214 dan x(t) = 38 + t/30·628 — suite M2 memakai
+   angka itu apa adanya. M10: fungsi menerima {w,h} dari ukuran NYATA kartu →
+   plot mengisi tinggi kolom tengah (tanpa void bawah); margin tetap: kiri 38
+   (label Hz), kanan 14 (label tahap), atas 12, bawah 24 (label waktu) / 26 (volt).
+   Kelas kunci utk tes: .band, .thr, .ev, .trip, .floor (lantai), .pt (penunjuk). */
+function fToY(f, H) { H = H || 250; return 12 + (52 - f) / 5 * (H - 36); } // 36 = margin 12+24
+function tToX(t, W) { W = W || 680; return 38 + t / 30 * (W - 52); }      // 52 = margin 38+14
+function plotDims(dims, dw, dh) {
+  dims = dims || {};
+  return { w: dims.w || dw, h: dims.h || dh };
+}
+function voltY(v, H) { return 12 + (1.05 - v) / 0.2 * (H - 38); } // 38 = margin 12+26
 
-function renderFreq(p, run, t) {
+function renderFreq(p, run, t, dims) {
+  var D = plotDims(dims, 680, 250);
+  var W = D.w, H = D.h;
+  var R = W - 14, B = H - 24; // tepi kanan plot & bawah plot (47 Hz)
   var out = [];
-  out.push('<rect class="bg" x="0" y="0" width="680" height="250" fill="var(--surface)"/>');
+  out.push('<rect class="bg" x="0" y="0" width="' + W + '" height="' + H + '" fill="var(--surface)"/>');
   // grid y (0.5 Hz) + label
   for (var f = 47; f <= 52; f += 0.5) {
-    var y = fToY(f).toFixed(1);
-    out.push('<line x1="38" y1="' + y + '" x2="666" y2="' + y + '" stroke="var(--grid)" stroke-width="1"/>');
+    var y = fToY(f, H).toFixed(1);
+    out.push('<line x1="38" y1="' + y + '" x2="' + R + '" y2="' + y + '" stroke="var(--grid)" stroke-width="1"/>');
   }
   for (var fl = 47; fl <= 52; fl++) {
-    out.push('<text x="32" y="' + (fToY(fl) + 4).toFixed(1) + '" text-anchor="end" font-size="10.5" font-family="JetBrains Mono,monospace" fill="var(--ink-soft)">' + fl.toFixed(1) + '</text>');
+    out.push('<text x="32" y="' + (fToY(fl, H) + 4).toFixed(1) + '" text-anchor="end" font-size="10.5" font-family="JetBrains Mono,monospace" fill="var(--ink-soft)">' + fl.toFixed(1) + '</text>');
   }
   // grid x (5 s)
   for (var tt = 0; tt <= 30; tt += 5) {
-    var x = tToX(tt).toFixed(1);
-    out.push('<line x1="' + x + '" y1="12" x2="' + x + '" y2="226" stroke="var(--grid)" stroke-width="1"/>');
-    out.push('<text x="' + x + '" y="240" text-anchor="middle" font-size="10.5" font-family="JetBrains Mono,monospace" fill="var(--ink-soft)">' + tt + 's</text>');
+    var x = tToX(tt, W).toFixed(1);
+    out.push('<line x1="' + x + '" y1="12" x2="' + x + '" y2="' + B + '" stroke="var(--grid)" stroke-width="1"/>');
+    out.push('<text x="' + x + '" y="' + (H - 10) + '" text-anchor="middle" font-size="10.5" font-family="JetBrains Mono,monospace" fill="var(--ink-soft)">' + tt + 's</text>');
   }
   // pita normal ±0.2 (50.2 → 49.8)
-  var yHi = fToY(50.2), yLo = fToY(49.8);
-  out.push('<rect class="band" x="38" y="' + yHi.toFixed(2) + '" width="628" height="' + (yLo - yHi).toFixed(2) + '" fill="var(--green-soft)" opacity="0.4"/>');
+  var yHi = fToY(50.2, H), yLo = fToY(49.8, H);
+  out.push('<rect class="band" x="38" y="' + yHi.toFixed(2) + '" width="' + (R - 38) + '" height="' + (yLo - yHi).toFixed(2) + '" fill="var(--green-soft)" opacity="0.4"/>');
   // garis 50 Hz ditegaskan
-  out.push('<line x1="38" y1="' + fToY(50).toFixed(1) + '" x2="666" y2="' + fToY(50).toFixed(1) + '" stroke="var(--ink)" stroke-width="2"/>');
+  out.push('<line x1="38" y1="' + fToY(50, H).toFixed(1) + '" x2="' + R + '" y2="' + fToY(50, H).toFixed(1) + '" stroke="var(--ink)" stroke-width="2"/>');
   // ambang UFLS (putus-putus copper) + label
   (p.stages || []).forEach(function (st) {
-    var yt = fToY(st.thr).toFixed(1);
-    out.push('<line class="thr" x1="38" y1="' + yt + '" x2="666" y2="' + yt + '" stroke="var(--copper)" stroke-width="1.3" stroke-dasharray="6 4"/>');
-    out.push('<text x="670" y="' + (parseFloat(yt) + 4).toFixed(1) + '" font-size="10.5" font-family="JetBrains Mono,monospace" font-weight="600" fill="var(--copper-deep)">' + st.id + '</text>');
+    var yt = fToY(st.thr, H).toFixed(1);
+    out.push('<line class="thr" x1="38" y1="' + yt + '" x2="' + R + '" y2="' + yt + '" stroke="var(--copper)" stroke-width="1.3" stroke-dasharray="6 4"/>');
+    out.push('<text x="' + (W - 10) + '" y="' + (parseFloat(yt) + 4).toFixed(1) + '" font-size="10.5" font-family="JetBrains Mono,monospace" font-weight="600" fill="var(--copper-deep)">' + st.id + '</text>');
   });
   // kurva f(t)
   var pts = [];
   for (var i = 0; i < run.fs.length; i++) {
     if (run.ts[i] > 30) break;
-    pts.push(tToX(run.ts[i]).toFixed(1) + ',' + fToY(run.fs[i]).toFixed(1));
+    pts.push(tToX(run.ts[i], W).toFixed(1) + ',' + fToY(run.fs[i], H).toFixed(1));
   }
   out.push('<polyline points="' + pts.join(' ') + '" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>');
   // penanda peristiwa (t = tEvent) & trip (sampai playhead)
-  var evT = 1.0;
   if (run.ev && run.ev.length) {
-    var xe = tToX(run.ev[0].t).toFixed(1);
-    out.push('<line class="ev" x1="' + xe + '" x2="' + xe + '" y1="12" y2="226" stroke="var(--copper)" stroke-width="1" stroke-dasharray="2 3"/>');
+    var xe = tToX(run.ev[0].t, W).toFixed(1);
+    out.push('<line class="ev" x1="' + xe + '" x2="' + xe + '" y1="12" y2="' + B + '" stroke="var(--copper)" stroke-width="1" stroke-dasharray="2 3"/>');
     out.push('<text x="' + xe + '" y="13" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" fill="var(--copper)">peristiwa</text>');
   }
   (run.tripSeq || []).forEach(function (tr) {
     if (tr.t > t + 1e-9) return;
-    var xt = tToX(tr.t).toFixed(1), yt2 = fToY(tr.fAt).toFixed(1);
+    var xt = tToX(tr.t, W).toFixed(1), yt2 = fToY(tr.fAt, H).toFixed(1);
     out.push('<circle class="trip" cx="' + xt + '" cy="' + yt2 + '" r="4.5" fill="var(--red)" stroke="var(--surface)" stroke-width="1.5"/>');
   });
   // nilai f di playhead
   var fNow = fAt(run, t);
-  var xp = Math.min(tToX(Math.min(t, 30)).toFixed(1), 666);
-  out.push('<line x1="' + xp + '" x2="' + xp + '" y1="12" y2="226" stroke="var(--blue)" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>');
-  out.push('<text x="' + xp + '" y="238" text-anchor="middle" font-size="10.5" font-family="JetBrains Mono,monospace" fill="var(--blue)">' + fNow.toFixed(2) + '</text>');
+  var xp = Math.min(tToX(Math.min(t, 30), W), R);
+  out.push('<line x1="' + xp + '" x2="' + xp + '" y1="12" y2="' + B + '" stroke="var(--blue)" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>');
+  out.push('<text x="' + xp + '" y="' + (H - 12) + '" text-anchor="middle" font-size="10.5" font-family="JetBrains Mono,monospace" fill="var(--blue)">' + fNow.toFixed(2) + '</text>');
   return out.join('\n');
 }
 
-function renderGauge(f) {
+function renderGauge(f, dims) {
+  var D = plotDims(dims, 74, 250);
+  var H = D.h; // lebar desain tetap 74 (label & pointer di kanan bar)
   var out = [];
-  out.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 74 250">');
+  out.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 74 ' + H + '">');
   out.push('<defs><linearGradient id="fg" x1="0" y1="0" x2="0" y2="1">');
   // plan-02 §4.4b: hijau HANYA di pita normal 50,2→49,8; over-frekuensi copper; bawah fade merah
   out.push('<stop offset="0%" stop-color="var(--copper)"/>');   // 52 Hz — over-frekuensi
@@ -1068,61 +1087,77 @@ function renderGauge(f) {
   out.push('<stop offset="62%" stop-color="var(--copper)"/>'); // transisi ke merah
   out.push('<stop offset="100%" stop-color="var(--red)"/>'); // 47 Hz merah
   out.push('</linearGradient></defs>');
-  out.push('<rect x="30" y="12" width="18" height="214" rx="4" fill="url(#fg)"/>');
+  out.push('<rect x="30" y="12" width="18" height="' + (H - 36) + '" rx="4" fill="url(#fg)"/>');
   for (var fg = 47; fg <= 52; fg++) {
-    var y = fToY(fg).toFixed(1);
+    var y = fToY(fg, H).toFixed(1);
     out.push('<line x1="50" y1="' + y + '" x2="58" y2="' + y + '" stroke="var(--ink-soft)" stroke-width="1"/>');
     out.push('<text x="64" y="' + (parseFloat(y) + 3).toFixed(1) + '" font-size="10" font-family="JetBrains Mono,monospace" fill="var(--ink-soft)">' + fg + '</text>');
   }
-  var yp = fToY(Math.max(47, Math.min(52, f)));
+  var yp = fToY(Math.max(47, Math.min(52, f)), H);
   out.push('<line class="pt" x1="20" y1="' + yp.toFixed(1) + '" x2="30" y2="' + yp.toFixed(1) + '" stroke="var(--ink)" stroke-width="4" stroke-linecap="round"/>');
-  out.push('<text x="37" y="244" text-anchor="middle" font-size="11" font-weight="600" font-family="JetBrains Mono,monospace" fill="var(--ink)">' + f.toFixed(2) + ' Hz</text>');
+  out.push('<text x="37" y="' + (H - 6) + '" text-anchor="middle" font-size="11" font-weight="600" font-family="JetBrains Mono,monospace" fill="var(--ink)">' + f.toFixed(2) + ' Hz</text>');
   out.push('</svg>');
   return out.join('\n');
 }
 
-function renderVolt(run) {
+function renderVolt(run, dims) {
+  var D = plotDims(dims, 680, 190);
+  var W = D.w, H = D.h;
+  var R = W - 14;
   var out = [];
-  out.push('<rect x="0" y="0" width="680" height="190" fill="var(--surface)"/>');
-  // skala pu 0.85–1.05 (0.05/langkah), y = 12 + (1.05−v)/0.2·152
+  out.push('<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="var(--surface)"/>');
+  // skala pu 0.85–1.05 (0.05/langkah); voltY: atas 12, span penuh (H−38), bawah 26
   for (var vi = 85; vi <= 105; vi += 5) { // langkah integer (hindari akumulasi float)
     var v = vi / 100;
-    var yv = (12 + (1.05 - v) / 0.2 * 152).toFixed(1);
-    out.push('<line x1="38" y1="' + yv + '" x2="666" y2="' + yv + '" stroke="var(--grid)" stroke-width="1"/>');
+    var yv = voltY(v, H).toFixed(1);
+    out.push('<line x1="38" y1="' + yv + '" x2="' + R + '" y2="' + yv + '" stroke="var(--grid)" stroke-width="1"/>');
     out.push('<text x="32" y="' + (parseFloat(yv) + 4).toFixed(1) + '" text-anchor="end" font-size="10.5" font-family="JetBrains Mono,monospace" fill="var(--ink-soft)">' + v.toFixed(2) + '</text>');
   }
   for (var tt = 0; tt <= 30; tt += 5) {
-    var x = tToX(tt).toFixed(1);
-    out.push('<text x="' + x + '" y="184" text-anchor="middle" font-size="10.5" font-family="JetBrains Mono,monospace" fill="var(--ink-soft)">' + tt + 's</text>');
+    var x = tToX(tt, W).toFixed(1);
+    out.push('<text x="' + x + '" y="' + (H - 6) + '" text-anchor="middle" font-size="10.5" font-family="JetBrains Mono,monospace" fill="var(--ink-soft)">' + tt + 's</text>');
   }
-  // lantai 0.85
-  out.push('<line class="floor" x1="38" y1="164" x2="666" y2="164" stroke="var(--red)" stroke-width="1" stroke-dasharray="6 4" opacity="0.7"/>');
-  out.push('<text x="670" y="168" text-anchor="end" font-size="10" font-family="JetBrains Mono,monospace" fill="var(--red)">lantai 0.85</text>');
+  // lantai 0.85 (bawah plot)
+  var fl = voltY(0.85, H).toFixed(1);
+  out.push('<line class="floor" x1="38" y1="' + fl + '" x2="' + R + '" y2="' + fl + '" stroke="var(--red)" stroke-width="1" stroke-dasharray="6 4" opacity="0.7"/>');
+  out.push('<text x="' + (W - 10) + '" y="' + (parseFloat(fl) + 4).toFixed(1) + '" text-anchor="end" font-size="10" font-family="JetBrains Mono,monospace" fill="var(--red)">lantai 0.85</text>');
   var pts = [];
   for (var i = 0; i < run.vs.length; i++) {
     if (run.ts[i] > 30) break;
-    var xv = tToX(run.ts[i]).toFixed(1);
-    var yv2 = (12 + (1.05 - run.vs[i]) / 0.2 * 152).toFixed(1);
+    var xv = tToX(run.ts[i], W).toFixed(1);
+    var yv2 = voltY(run.vs[i], H).toFixed(1);
     pts.push(xv + ',' + yv2);
   }
   out.push('<polyline points="' + pts.join(' ') + '" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>');
   return out.join('\n');
 }
 
+function svgBox(el, dw, dh) {
+  var w = el.clientWidth, h = el.clientHeight;
+  if (!(w > 40)) w = dw;
+  if (!(h > 40)) h = dh;
+  return { w: Math.round(w), h: Math.round(h) };
+}
 function renderFreqInto() {
   var el = document.getElementById('fSvg');
   if (!el || !S.run) return;
-  el.innerHTML = renderFreq(paramP(), S.run, S.ui.tNow);
+  var b = svgBox(el, 680, 250);
+  el.setAttribute('viewBox', '0 0 ' + b.w + ' ' + b.h);
+  el.innerHTML = renderFreq(paramP(), S.run, S.ui.tNow, { w: b.w, h: b.h });
 }
 function renderGaugeInto() {
   var el = document.getElementById('gauge');
   if (!el || !S.run) return;
-  el.innerHTML = renderGauge(fAt(S.run, S.ui.tNow));
+  var b = svgBox(el, 74, 250);
+  if (b.w > 74) b.w = 74; // gauge tetap selebar desain 74 px
+  el.innerHTML = renderGauge(fAt(S.run, S.ui.tNow), { w: b.w, h: b.h });
 }
 function renderVoltInto() {
   var el = document.getElementById('vSvg');
   if (!el || !S.run) return;
-  el.innerHTML = renderVolt(S.run);
+  var b = svgBox(el, 680, 190);
+  el.setAttribute('viewBox', '0 0 ' + b.w + ' ' + b.h);
+  el.innerHTML = renderVolt(S.run, { w: b.w, h: b.h });
 }
 function renderCharts() { renderFreqInto(); renderGaugeInto(); renderVoltInto(); }
 
@@ -1490,6 +1525,7 @@ function syncViewDom() {
     btns[i].className = btns[i].dataset.view === S.ui.view ? 'active' : '';
   }
   if (S.ui.view === 'sld') fitSld();
+  if (S.ui.view === 'graf') renderCharts(); // M10: ukur ulang kotak & gambar penuh
 }
 
 /* ── tab kartu kanan (isi penuh M3) ── */
@@ -1581,6 +1617,11 @@ if (typeof ResizeObserver !== 'undefined') {
   var ro = new ResizeObserver(function () { fitSld(); });
   var viewEl = document.getElementById('viewSld');
   if (viewEl) ro.observe(viewEl);
+  var rg = new ResizeObserver(function () {
+    if (S.ui.view === 'graf' && S.run) renderCharts(); // M10: grafik ikut resize
+  });
+  var grafEl = document.getElementById('viewGraf');
+  if (grafEl) rg.observe(grafEl);
 }
 setTimeout(fitSld, 350);
 

@@ -31,7 +31,8 @@ Tidak ada instalasi, tidak ada build. Semua model & UI ada di satu file.
   detik dinding), scrubber 0–30 s, Reset.
 - **Grafik frekuensi** 0–30 s / 47–52 Hz: pita normal ±0,2 Hz, garis 50 Hz,
   ambang UFLS T1–T4 putus-putus, penanda peristiwa & trip; **indikator batang
-  gradien** hijau→copper→merah dengan penunjuk & nilai.
+  gradien** hijau→copper→merah dengan penunjuk & nilai. Kartu grafik **mengisi
+  penuh tinggi kolom** (svg diukur & digambar ulang 1:1 — tanpa ruang kosong bawah).
 - **Grafik tegangan** (ilustratif — bukan hasil aliran daya): lekukan & pemulihan
   eksponensial, lantai 0,85 pu saat runtuh.
 - **Kartu status 2 tab**: Kondisi sistem (pill status + fase kendali, f, ROCOF,
@@ -54,8 +55,8 @@ node tools/ui.test.js        # seam desain & perilaku UI
 node tools/shoot.js          # screenshot semua view → tools/shots/
 ```
 
-123 asersi, hijau di Node ≥ 22 (tanpa dependensi) — model 33 · timeline 21 · sld 24 ·
-charts 14 · ui 31. Detail: `docs/overview.md`, `docs/PRD.md` (model),
+131 asersi, hijau di Node ≥ 22 (tanpa dependensi) — model 33 · timeline 21 · sld 24 ·
+charts 19 · ui 34. Detail: `docs/overview.md`, `docs/PRD.md` (model),
 `docs/implementation-plan.md` (kontrak).
 
 ## Catatan

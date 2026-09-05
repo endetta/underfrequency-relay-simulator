@@ -324,5 +324,27 @@ check('review: beban [MW] mengubah chip label & skenario loadStep (AGC dispatch 
   A.computeRun();
 });
 
+/* ===== M10: grafik mengisi kolom tengah (fit tinggi kartu — tanpa void bawah) ===== */
+check('M10: kartu grafik flex mengisi tinggi view (bukan tinggi tetap / height:auto)', () => {
+  contains(src, '.view-graf{display:flex;flex-direction:column;min-height:0;}', 'view graf flex kolom');
+  contains(src, '.view-graf .chart-card{flex:1 1 0;', 'kartu grafik flex:1');
+  contains(src, '.chart-card .frow{flex:1;', 'baris frekuensi flex');
+  if (src.includes('.chart-card svg{display:block;max-width:100%;height:auto;}')) {
+    throw new Error('svg grafik height:auto → tinggi terbatas aspek, void bawah');
+  }
+});
+check('M10: renderer grafik membaca dimensi kotak & set viewBox (fit dinamis)', () => {
+  contains(src, "el.setAttribute('viewBox', '0 0 ' + b.w + ' ' + b.h)", 'fSvg viewBox dinamis');
+  contains(src, 'renderFreq(paramP(), S.run, S.ui.tNow, { w: b.w, h: b.h })', 'freq dims');
+  contains(src, 'renderGauge(fAt(S.run, S.ui.tNow), { w: b.w, h: b.h })', 'gauge dims');
+  contains(src, 'renderVolt(S.run, { w: b.w, h: b.h })', 'volt dims');
+});
+check('M10: re-render grafik saat resize (#viewGraf di-observe) & saat switch ke Grafik', () => {
+  contains(src, "if (S.ui.view === 'graf') renderCharts();", 'switch → render ulang');
+  contains(src, 'document.getElementById(\'viewGraf\')', 'observasi viewGraf');
+  contains(src, 'var rg = new ResizeObserver(function () {', 'observer kedua');
+  contains(src, 'if (grafEl) rg.observe(grafEl);', 'viewGraf di-observe');
+});
+
 console.log(`\n${passed} lulus, ${failed} gagal`);
 process.exit(failed ? 1 : 0);

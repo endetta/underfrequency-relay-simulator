@@ -6,8 +6,8 @@
 > **Catatan (2026-09-05):** lanjutan M5–M9 juga selesai & ter-push — M5 rombak
 > layout satu layar (plan-02), M6 AGC + player real-time 0–30 s (plan-03 /
 > ADR-0006), M7 temuan code-review (skenario lengkap PRD), M8 bug play + rombak
-> SLD, M9 audit overlap SLD. Rencana & log rinci: `design-plans/`. Kontrak model
-> tetap PRD §5.
+> SLD, M9 audit overlap SLD, M10 grafik mengisi kolom tengah (renderer adaptif
+> dims — lihat §5). Rencana & log rinci: `design-plans/`. Kontrak model tetap PRD §5.
 > **Sumber masukan:** `docs/PRD.md` (§5 = sumber kebenaran model), `docs/adr/0001–0006`,
 > `CONTEXT.md`, `docs/research/pln-underfrequency-practice.md`, `prototype.html`
 > (disetujui dengan revisi, lihat §2), `tools/shoot-proto.js` (harness screenshot).
@@ -112,6 +112,9 @@ tunda habis; tahap yang trip **terkunci**; dasar fraksi = beban **pra-gangguan**
   garis 50 dipertegas), garis ambang putus-putus copper berlabel T1–T4, penanda
   peristiwa & trip, **x 0–30 s** (M6/ADR-0006); **indikator batang gradien**
   hijau→copper→merah 47–52 + penunjuk + nilai (stops ramp final di M3/M5).
+  Kartu grafik **flex mengisi penuh tinggi kolom tengah (M10)**: tiap SVG diukur
+  & digambar ulang 1:1 px (`renderFreq/renderGauge/renderVolt` menerima `{w,h}`;
+  `fToY(f,H)` / `tToX(t,W)`; margin atas 12 / bawah 24, volt 26) — tanpa void.
 - **Grafik tegangan**: pu 0,85–1,05, label permanen "ilustratif — bukan hasil aliran
   daya", kV di foot.
 - **Kartu kanan 2 tab**: `Kondisi sistem` (pill status + fase kendali

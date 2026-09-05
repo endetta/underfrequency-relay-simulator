@@ -138,6 +138,38 @@ check('tegangan: kurva V(t) non-kosong; run RUNTUH berakhir di lantai 0.85', () 
   approx(r.finalV, 0.85, 0.001, 'finalV lantai');
 });
 
+/* ── M10: grafik ADAPTIF — skala mengisi kotak kartu (dimensi dinamis) ──
+   Default (tanpa dims) harus tetap 680×250 / 74×250 / 680×190 agar suite
+   lama (literal M2) tak berubah; argumen dims {w,h} membuat plot mengisi
+   tinggi kartu di layout satu layar (tanpa void bawah). */
+check('M10: fToY adaptif tinggi H — y(52)=12, y(50)=133.6, y(47)=316 @H=340', () => {
+  approx(A.fToY(52, 340), 12, 1e-6, 'y52@340');
+  approx(A.fToY(50, 340), 133.6, 1e-6, 'y50@340'); // 12 + 2/5·304
+  approx(A.fToY(47, 340), 316, 1e-6, 'y47@340');   // 12 + 304
+});
+check('M10: tToX adaptif lebar W — x(30)=546 @W=560 (default 680 tak berubah)', () => {
+  approx(A.tToX(0, 560), 38, 1e-6, 'x0@560');
+  approx(A.tToX(30, 560), 546, 1e-6, 'x30@560');  // 38 + 508
+});
+check('M10: renderFreq dims {680,340} — grid & pita & label x menempati tinggi baru', () => {
+  const s = A.renderFreq(impP, impRun, 2.2, { w: 680, h: 340 });
+  if (!s.includes('y="121.44"')) throw new Error('pita normal atas 50.2 harus y=121.44 @H=340');
+  if (!s.includes('height="24.32"')) throw new Error('pita normal harus tinggi 24.32 @H=340');
+  if (!s.includes('y2="316.0"')) throw new Error('plot bottom (47 Hz) harus y=316.0 @H=340');
+  if (!s.includes('y="330"')) throw new Error('label x tick harus y=330 (H−10) @H=340');
+});
+check('M10: renderVolt dims {680,285} — lantai & label x di tinggi baru', () => {
+  const s = A.renderVolt(impRun, { w: 680, h: 285 });
+  if (!s.includes('y1="259.0"') || !s.includes('y2="259.0"')) throw new Error('lantai 0.85 harus y=259.0 (H−26) @H=285');
+  if (!s.includes('y="279"')) throw new Error('label x volt harus y=279 (H−6) @H=285');
+});
+check('M10: gauge dims {74,340} — bar, penunjuk & nilai bottom menempati tinggi baru', () => {
+  const s = A.renderGauge(50, { w: 74, h: 340 });
+  if (!s.includes('height="304"')) throw new Error('bar gradien harus tinggi 304 @H=340');
+  if (!s.includes('y1="133.6"')) throw new Error('penunjuk 50 Hz harus y=133.6 @H=340');
+  if (!s.includes('y="334"')) throw new Error('nilai f bottom harus y=334 (H−6) @H=340');
+});
+
 /* ── render master: grafik masuk ke DOM ── */
 /* ── floor tipografi kanvas (plan-02 §4.4) ── */
 check('font floor: semua font-size grafik & gauge >= 10 (plan-02)', () => {

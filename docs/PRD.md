@@ -125,6 +125,12 @@ biasa dengan kartu menumpuk (collapse `.card-b-i`).
   kartu kanan = nilai langsung).
 
 ### 4.4 Grafik & indikator
+- **Kartu grafik mengisi kolom tengah (M10)**: kartu flex bertumpuk menempati
+  seluruh tinggi kolom; setiap SVG diukur (`clientWidth/Height`) lalu digambar
+  ulang **1:1 px** ke kotak itu (`viewBox` dinamis; `renderFreq/renderGauge/
+  renderVolt` menerima `{w,h}`) — skala vertikal menyesuaikan tinggi kartu sehingga
+  tidak ada ruang kosong besar di bawah saat layar tinggi. Formula di §7 item 3–4
+  = skala **desain/nominal** (kotak 680×250/74×250/680×190), tetap dipakai tes.
 - **Grafik frekuensi**: x = waktu engineering (s, jendela 0–30 s — §7 item 3 / ADR-0006), y = 47–52 Hz;
   kurva `f(t)`; **garis panduan putus-putus** di 49,5/49,0/48,5/48,0 berlabel tahap;
   penanda peristiwa; penanda trip tahap bila perlu. Pita normal 50 ±0,2 Hz diberi
@@ -294,4 +300,6 @@ Tidak ada auth/Clerk di v1 (keputusan Round 1). Bahasa UI/dokumen = Indonesia.
    scrubber mengikuti `tMax` run (= 30 s di UI).
 4. Skala frekuensi DIKUNCI 47–52 Hz (`y(f) = 12 + (52−f)/5·214`), grid 0,5 Hz,
    pita normal ±0,2 Hz, ambang UFLS putus-putus copper berlabel T1–T4, penanda
-   peristiwa (t = 1,0 s) & trip (lingkaran merah) sampai playhead.
+   peristiwa (t = 1,0 s) & trip (lingkaran merah) sampai playhead. Nilai = skala
+   **desain** kotak 680×250; renderer (M10) menskalakan vertikal ke tinggi kartu
+   nyata (margin tetap: atas 12 / bawah 24 Hz, 26 V), lihat §4.4.
