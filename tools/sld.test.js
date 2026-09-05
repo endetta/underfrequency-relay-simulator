@@ -40,10 +40,10 @@ check('baseline: 3 simbol generator lingkaran + 6 garis silang (×)', () => {
   if (count(s, '<circle class="gen"') !== 3) throw new Error('harus 3 lingkaran generator');
   if (count(s, 'class="xc"') !== 6) throw new Error('harus 6 garis salib (2 per generator)');
 });
-check('baseline: bus solid tebal (stroke-width 6), TANPA stroke-dasharray di jalur daya', () => {
+check('baseline: bus solid tebal (stroke-width 7), TANPA stroke-dasharray di jalur daya', () => {
   const s = renderAt(baseP, baseRun, 0);
   if (count(s, 'class="bus"') !== 1) throw new Error('harus ada 1 bus');
-  if (!s.includes('stroke-width="6"')) throw new Error('bus harus tebal');
+  if (!s.includes('stroke-width="7"')) throw new Error('bus harus tebal');
   if (s.includes('stroke-dasharray')) throw new Error('jalur daya tidak boleh putus-putus');
 });
 check('baseline: 6 pemutus lurus (1 impor + 5 feeder), tanpa rotasi, tanpa label TERBUKA', () => {
@@ -58,8 +58,8 @@ check('baseline: interkoneksi 400 MW berlabel, beban 1100 MW, vital teal tersamb
   if (!s.includes('400 MW')) throw new Error('label impor harus 400 MW');
   if (!s.includes('Beban 1100 MW')) throw new Error('label beban harus 1100 MW');
   if (!s.includes('VITAL · 550 MW')) throw new Error('label vital harus VITAL · 550 MW');
-  // garis vital (teal) harus benar-benar menempel ke bus: segmen dari bus ke atas
-  if (!s.includes('x1="750" y1="120" x2="750" y2="82" stroke="#13697A"')) {
+  // garis vital (teal) harus benar-benar menempel ke bus: segmen dari bus ke atas (plan-02 §4.3)
+  if (!s.includes('x1="540" y1="72" x2="540" y2="252" stroke="#13697A"')) {
     throw new Error('feeder vital harus tersambung solid ke bus dengan warna teal');
   }
   if (count(s, 'stroke="#13697A"') < 2) throw new Error('vital harus bergaris teal');
@@ -80,7 +80,7 @@ check('lepas interkoneksi (t=1.3): pemutus impor miring 45° + label TERBUKA + 0
   const s = renderAt(impP, impRun, 1.3);
   if (!s.includes('0 MW · LEPAS')) throw new Error('label impor harus 0 MW · LEPAS');
   if (count(s, 'data-open="1"') !== 1) throw new Error('tepat 1 pemutus terbuka (impor)');
-  if (!s.includes('rotate(45 80 116)')) throw new Error('pemutus impor harus miring 45°');
+  if (!s.includes('rotate(45 115 256)')) throw new Error('pemutus impor harus miring 45°');
   if (count(s, 'TERBUKA') !== 1) throw new Error('1 label TERBUKA');
   if (s.includes('stroke-dasharray')) throw new Error('tetap tanpa dasharray');
 });
@@ -112,6 +112,15 @@ check('lepas G1: chip G1 TRIP (abu) + 0 MW; G2/G3 online; beban akhir 550 MW · 
 check('lepas G1: tanpa dasharray di semua keadaan', () => {
   const s = renderAt(g1P, g1Run, T_END);
   if (s.includes('stroke-dasharray')) throw new Error('dilarang stroke-dasharray');
+});
+
+/* ── floor tipografi kanvas (plan-02 §4.4) ── */
+check('font floor: semua font-size SLD >= 10 (plan-02)', () => {
+  const s = renderAt(baseP, baseRun, 0);
+  const sizes = [...s.matchAll(/font-size="([0-9.]+)"/g)].map(m => parseFloat(m[1]));
+  if (!sizes.length) throw new Error('harus ada teks SVG');
+  const min = Math.min(...sizes);
+  if (min < 10) throw new Error('font terkecil ' + min + ' px < 10');
 });
 
 /* ── render master & fAt ── */

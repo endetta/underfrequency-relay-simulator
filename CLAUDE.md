@@ -19,6 +19,11 @@ langsung di browser atau `python -m http.server`.
   berlabel ambar — belum diverifikasi ke pedoman resmi PLN).
 - Rencana implementasi (kontrak milestone): `docs/implementation-plan.md` — M0–M4
   sudah selesai & ter-push; §7 PRD ditutup (ramp gauge, konstanta tegangan, jendela x).
+- **M5 (2026-09-05, plan-02)**: rombak layout desktop — satu layar terkunci
+  (seam Differential/Distance), splash AUTO, switch tengah `SLD|Grafik`, SLD
+  komposisi 700×520 + font SVG ≥ 10, gauge hijau HANYA di pita 50,2–49,8, params
+  kart-dalam-kart. Eksekusi & plan di `design-plans/plan-02-…`; log sesi di
+  `design-plans/sesi-2026-09-05-01-…`.
 
 ## Pintu masuk
 
@@ -34,6 +39,12 @@ langsung di browser atau `python -m http.server`.
 
 ## Seam & konvensi desain (warisan Differential/Distance)
 
+- **Layout desktop (M5)**: satu layar terkunci (`html,body{height:100%;overflow:hidden}`
+  + `.layout{flex:1;min-height:0;grid-template-rows:minmax(0,1fr)}`); kolom params &
+  kartu kanan scroll INTERNAL; tengah = `#vswitch` (`SLD|Grafik`) + satu hero per waktu
+  (`S.ui.view`, `setView`/`syncViewDom`, view tak aktif `display:none` — state run/playhead
+  aman); SLD `viewBox 700 520` + `fitSld()` skala min(w,h) → ≥ 1,0; splash AUTO
+  (20/1350/1860 ms, klik=skip, `prefers-reduced-motion`=skip langsung).
 - **Jangan regresi**: splash krem (#FDFAF3→#F8EFE1) dengan huruf S H E V A; judul
   bergantian `.tt-a` ↔ `.tt-b` (kilau `ttShine`, copper lembut #8A6B4D); kartu
   collapse `.card-b-i` (grid 1fr→0fr, BUKAN `display:none`); centering semua-ciut
@@ -98,6 +109,7 @@ play/speed/scrub/reset, tab kanan, collapse). Tidak ada build.
 - `pct` tahap UFLS = **fraksi** (0,05), bukan persen (5) — konversi `× beban dasar`.
 - `tools/shots/` & `tools/.tmp-*/` gitignored (artefak).
 - Prototipe `prototype.html` hidup di branch `prototype-v1` (aturan skill prototype).
-- Konstanta skala grafik dikunci (PRD §7): `y(f)=12+(52−f)/5·214`, `x(t)=38+t/12·628`,
-  gauge stops 0/40/55/100% (#2E7D46/#2E7D46/#B5651D/#C0392B) — tes memakai literal.
+- Konstanta skala grafik dikunci (PRD §7): `y(f)=12+(52−f)/5·214`, `x(t)=38+t/12·628`;
+  gauge stops (M5): 0/36/38/44/62/100% (copper/copper/hijau/hijau/copper/merah — hijau
+  HANYA pita 50,2–49,8, over-frekuensi copper) — tes memakai literal.
 - Windows + Git Bash: perintah POSIX (`ls`, `mv`, `rm`); warning LF→CRLF benign.

@@ -17,19 +17,45 @@
   body{margin:0;background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;font-size:14px;line-height:1.5;}
   .wrap{max-width:1560px;margin:0 auto;padding:14px 22px 40px;}
 
-  /* ===== layout varian A (PRD §4): params | SLD+transport+grafik | status ===== */
-  .layout{display:grid;grid-template-columns:296px minmax(0,1fr) 336px;gap:16px;align-items:start;
-    grid-template-areas:"params sld side" "params tr side" "params fch side" "params vch side";}
-  .l-p{grid-area:params}.l-sld{grid-area:sld}.l-tr{grid-area:tr}.l-fch{grid-area:fch}.l-vch{grid-area:vch}.l-side{grid-area:side}
-  @media(max-width:1240px){.layout{grid-template-columns:296px minmax(0,1fr);grid-template-areas:"params sld" "params tr" "params fch" "params vch";}
-    .l-side{grid-column:1/-1;}}
-  @media(max-width:900px){.layout{grid-template-columns:1fr;grid-template-areas:"sld" "tr" "fch" "vch" "params" "side";}}
-
-  /* ===== kunci tinggi desktop: kolom kiri & kanan scroll internal ===== */
-  @media (min-width:921px) and (min-height:600px){
-    .l-p{position:sticky;top:0;max-height:100vh;}
-    .l-side{position:sticky;top:0;max-height:100vh;}
+  /* ===== layout (plan-02): params | center(switch+hero) | status ===== */
+  .layout{display:grid;grid-template-columns:300px minmax(0,1fr) 320px;gap:14px;align-items:stretch;
+    grid-template-areas:"params center side";}
+  .l-p{grid-area:params;display:flex;flex-direction:column;min-width:0;}
+  .l-c{grid-area:center;display:flex;flex-direction:column;min-width:0;}
+  .l-side{grid-area:side;display:flex;flex-direction:column;min-width:0;}
+  @media(max-width:920px){
+    .layout{grid-template-columns:1fr;grid-template-areas:"center" "params" "side";gap:12px;}
+    .l-c{display:block;}
+    .vswitch{display:none!important;}
+    .view{display:block!important;overflow:visible!important;flex:none!important;}
   }
+
+  /* ===== kunci satu layar desktop (seam Differential/Distance — plan-02 §4.1) ===== */
+  @media (min-width:921px) and (min-height:600px){
+    html,body{height:100%;overflow:hidden;}
+    #root{height:100%;}
+    .wrap{height:100%;padding:10px 22px 12px;display:flex;flex-direction:column;}
+    .topbar{flex:none;}
+    .layout{flex:1;min-height:0;grid-template-rows:minmax(0,1fr);}
+    .l-p,.l-c,.l-side{min-height:0;overflow:hidden;}
+    .params-panel{flex:1;min-height:0;}
+    .side-card{flex:1;min-height:0;}
+    .transport{flex:none;}
+  }
+
+  /* ===== switch tampilan tengah (plan-02 §4.2): SLD | Grafik ===== */
+  .vswitch{flex:none;display:flex;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px;margin-bottom:10px;}
+  .vswitch button{flex:1;padding:6px 4px;border:1px solid var(--line);background:var(--surface);border-radius:7px;font-family:'Inter',sans-serif;font-size:11.5px;font-weight:500;color:var(--ink-soft);cursor:pointer;}
+  .vswitch button.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .view{flex:1;min-height:0;overflow:hidden;}
+  .view.hidden{display:none;}
+  .view-sld{display:flex;flex-direction:column;}
+  .view-sld .sld-card{flex:1;min-height:0;display:flex;flex-direction:column;margin-bottom:0;}
+  .view-sld .sld-title{flex:none;}
+  .view-sld svg{flex:1;min-height:0;margin:auto;}
+  .view-sld .legend{flex:none;}
+  .view-graf{display:flex;flex-direction:column;}
+  .view-graf .chart-card{margin-bottom:10px;}
 
   .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 15px;margin-bottom:14px;}
   .card-h{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;margin:0 0 12px;overflow:hidden;}
@@ -46,7 +72,7 @@
   *::-webkit-scrollbar-track{background:transparent;}
   *::-webkit-scrollbar-thumb{background:var(--line);border-radius:10px;}
   *::-webkit-scrollbar-thumb:hover{background:var(--blue-soft);}
-  .params-panel{display:flex;flex-direction:column;gap:14px;overflow-y:auto;scrollbar-gutter:stable;padding:2px 3px 2px 0;transition:padding-top .35s ease;}
+  .params-panel{display:flex;flex-direction:column;gap:14px;overflow-y:auto;scrollbar-gutter:stable;padding:2px 3px 14px 0;transition:padding-top .35s ease;}
   .params-panel .card{margin-bottom:0;}
   @media(max-width:900px){.params-panel{height:auto!important;overflow:visible;scrollbar-gutter:auto;}}
   /* pusat tumpukan saat semua ciut DIATUR via padding-top inline (animatable) —
@@ -60,6 +86,13 @@
   .q{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:var(--blue-soft);color:var(--blue);cursor:help;font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:700;line-height:1;flex:none;}
   .q:hover{background:var(--blue);color:#fff;}
   .card-h .q{width:13px;height:13px;font-size:9px;}
+  /* kart-dalam-kart unit pembangkit (plan-02 §4.6) */
+  .gencard{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin-bottom:8px;}
+  .gencard:last-child{margin-bottom:0;}
+  .gencard-h{display:flex;align-items:center;gap:7px;font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;margin-bottom:4px;}
+  .gencard-h .gdot{width:8px;height:8px;border-radius:50%;background:var(--blue);flex:none;}
+  .gencard-h b{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:600;color:var(--ink);}
+  .gencard .gspec{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-soft);}
   #qTip{position:fixed;z-index:70;max-width:260px;pointer-events:none;background:var(--ink);color:#FDFAF3;
     border:1px solid rgba(255,255,255,.09);border-radius:9px;padding:8px 11px;font-family:'Inter',sans-serif;
     font-size:11px;line-height:1.55;box-shadow:0 10px 26px rgba(22,35,58,.32);display:none;}
@@ -101,7 +134,7 @@
   .topbar .tt::before{content:'';width:9px;height:9px;border-radius:50%;background:var(--copper);box-shadow:0 0 0 3.5px var(--copper-soft);margin-right:11px;flex:none;}
 
   /* ===== kartu SLD ===== */
-  .sld-card{grid-area:sld;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;}
+  .sld-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;}
   .sld-card .sld-title{font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:600;margin:0 0 8px;display:flex;align-items:center;gap:8px;}
   .sld-card .sld-title .tag{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:400;color:var(--ink-soft);background:var(--bg);border-radius:999px;padding:2px 9px;}
   .sld-card svg{display:block;margin:0 auto;max-width:100%;height:auto;}
@@ -111,7 +144,7 @@
   .legend i.brkopen{background:var(--surface);border:1.5px solid var(--red);transform:rotate(45deg);border-radius:2px;}
 
   /* ===== transport kompak (satu baris ramping, tinggi ≤ 40 px) ===== */
-  .transport{grid-area:tr;display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);
+  .transport{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);
     border-radius:12px;padding:5px 12px;height:40px;min-width:0;}
   .transport .tb{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--ink-soft);white-space:nowrap;}
   .transport .tb b{color:var(--ink);font-weight:600;}
@@ -121,15 +154,14 @@
   .spd button.active{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600;}
 
   /* ===== kartu grafik (M2) & status (M3) — shell hadir sejak M1 ===== */
-  .chart-card{grid-area:fch;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-height:130px;}
-  .chart-card.v{grid-area:vch;}
+  .chart-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-height:130px;}
   .chart-card .frow{display:flex;gap:10px;align-items:stretch;}
   .chart-card .frow svg{flex:1;min-width:0;display:block;}
   .chart-card .gwrap{width:74px;flex:none;display:flex;align-items:stretch;}
   .chart-card .gwrap svg{width:74px;display:block;}
   .chart-card svg{display:block;max-width:100%;height:auto;}
   .chart-card .clab{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-soft);margin-bottom:6px;}
-  .side-card{grid-area:side;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;min-height:0;}
+  .side-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;min-height:0;}
   .side-card .tabs{display:flex;gap:6px;margin-bottom:12px;}
   .side-card .tabs button{flex:1;padding:7px 4px;border:1px solid var(--line);background:var(--surface);border-radius:7px;font-family:'Inter',sans-serif;font-size:11.5px;font-weight:500;color:var(--ink-soft);cursor:pointer;}
   .side-card .tabs button.active{background:var(--blue);border-color:var(--blue);color:#fff;}
@@ -267,41 +299,52 @@
       </div>
     </div>
 
-    <!-- ===== TENGAH: SLD + transport + grafik ===== -->
-    <div class="sld-card" id="sldCard">
-      <div class="sld-title"><span class="dot"></span>Diagram satu garis (SLD)<span class="tag" id="sldTag">SEIMBANG · 50.00 Hz</span></div>
-      <svg id="sld" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 248" role="img" aria-label="Diagram satu garis sistem satu area"></svg>
-      <div class="legend" id="legend">
-        <span><i style="background:var(--green)"></i>ONLINE</span>
-        <span><i style="background:var(--red)"></i>TRIP / terbuka</span>
-        <span><i style="background:var(--copper)"></i>batas governor</span>
-        <span><i style="background:var(--teal)"></i>beban vital</span>
-        <span><i class="brkopen"></i>pemutus terbuka</span>
+    <!-- ===== TENGAH: switch view + hero (SLD | Grafik) + transport (plan-02) ===== -->
+    <div class="l-c">
+      <div class="vswitch" id="vswitch">
+        <button data-view="sld" class="active">SLD</button>
+        <button data-view="graf">Grafik</button>
       </div>
-    </div>
 
-    <div class="transport" id="transport">
-      <button class="mini-btn hl" id="playBtn" title="Jalankan / jeda">▶</button>
-      <span class="spd" id="spdGroup">
-        <button data-spd="0.5">0,5×</button>
-        <button data-spd="1" class="active">1×</button>
-        <button data-spd="2">2×</button>
-      </span>
-      <input type="range" id="scrub" min="0" max="20" step="0.01" value="0" title="Geser waktu">
-      <span class="tb">t = <b id="tNow">0.00</b> s</span>
-      <button class="mini-btn" id="resetBtn">Reset</button>
-    </div>
-
-    <div class="chart-card">
-      <div class="clab">Frekuensi sistem f(t) — ambang tahap UFLS putus-putus</div>
-      <div class="frow">
-        <svg id="fSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 250" role="img" aria-label="Grafik frekuensi terhadap waktu"></svg>
-        <div class="gwrap" id="gauge"></div>
+      <div class="view view-sld" id="viewSld">
+        <div class="sld-card" id="sldCard">
+          <div class="sld-title"><span class="dot"></span>Diagram satu garis (SLD)<span class="tag" id="sldTag">SEIMBANG · 50.00 Hz</span></div>
+          <svg id="sld" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 520" role="img" aria-label="Diagram satu garis sistem satu area"></svg>
+          <div class="legend" id="legend">
+            <span><i style="background:var(--green)"></i>ONLINE</span>
+            <span><i style="background:var(--red)"></i>TRIP / terbuka</span>
+            <span><i style="background:var(--copper)"></i>batas governor</span>
+            <span><i style="background:var(--teal)"></i>beban vital</span>
+            <span><i class="brkopen"></i>pemutus terbuka</span>
+          </div>
+        </div>
       </div>
-    </div>
-    <div class="chart-card v">
-      <div class="clab">Tegangan bus V(t) — <b>ilustratif, bukan hasil aliran daya</b> · nominal 20 kV</div>
-      <svg id="vSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 190" role="img" aria-label="Grafik tegangan ilustratif"></svg>
+
+      <div class="view view-graf hidden" id="viewGraf">
+        <div class="chart-card">
+          <div class="clab">Frekuensi sistem f(t) — ambang tahap UFLS putus-putus</div>
+          <div class="frow">
+            <svg id="fSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 250" role="img" aria-label="Grafik frekuensi terhadap waktu"></svg>
+            <div class="gwrap" id="gauge"></div>
+          </div>
+        </div>
+        <div class="chart-card v">
+          <div class="clab">Tegangan bus V(t) — <b>ilustratif, bukan hasil aliran daya</b> · nominal 20 kV</div>
+          <svg id="vSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 190" role="img" aria-label="Grafik tegangan ilustratif"></svg>
+        </div>
+      </div>
+
+      <div class="transport" id="transport">
+        <button class="mini-btn hl" id="playBtn" title="Jalankan / jeda">▶</button>
+        <span class="spd" id="spdGroup">
+          <button data-spd="0.5">0,5×</button>
+          <button data-spd="1" class="active">1×</button>
+          <button data-spd="2">2×</button>
+        </span>
+        <input type="range" id="scrub" min="0" max="20" step="0.01" value="0" title="Geser waktu">
+        <span class="tb">t = <b id="tNow">0.00</b> s</span>
+        <button class="mini-btn" id="resetBtn">Reset</button>
+      </div>
     </div>
 
     <!-- ===== KANAN: kartu status 2 tab (isi penuh M3) ===== -->
@@ -651,6 +694,7 @@ var S = {
   ui: {
     collapsed: { unit: false, beban: false, skenario: false, tentang: false },
     sideTab: 'kondisi',
+    view: 'sld', // tampilan tengah (plan-02 §4.2): 'sld' | 'graf'
     playing: false, speed: 1, tNow: 0
   },
   run: null
@@ -689,9 +733,9 @@ function renderSld(p, t, run) {
   var gov = ufGovernorAt(gens, f);
   var out = [];
 
-  /* ── bus ── */
-  out.push('<line class="bus" x1="150" y1="120" x2="860" y2="120" stroke="#16233A" stroke-width="6" stroke-linecap="round"/>');
-  out.push('<text x="856" y="110" text-anchor="end" font-size="11" font-family="JetBrains Mono,monospace" fill="#4A5568">Beban '
+  /* ── bus (y=260, plan-02 §4.3) ── */
+  out.push('<line class="bus" x1="70" y1="260" x2="590" y2="260" stroke="#16233A" stroke-width="7" stroke-linecap="round"/>');
+  out.push('<text x="690" y="250" text-anchor="end" font-size="11.5" font-family="JetBrains Mono,monospace" font-weight="600" fill="#4A5568">Beban '
     + loadNow + ' MW' + (shedTotal ? ' · lepas ' + shedTotal : '') + '</text>');
 
   /* ── interkoneksi (kiri-atas) ── */
@@ -699,41 +743,40 @@ function renderSld(p, t, run) {
   var impTxt = impLost ? '0 MW · LEPAS' : impMw + ' MW';
   var impCol = impLost ? '#C0392B' : '#1F4E8C';
   var impBg  = impLost ? '#F8E4E1' : '#E7EEF6';
-  out.push('<rect class="imp" x="30" y="66" width="100" height="30" rx="7" fill="' + impBg + '" stroke="' + impCol + '"/>');
-  out.push('<text x="80" y="79" text-anchor="middle" font-size="8.5" font-family="JetBrains Mono,monospace" letter-spacing=".08em" fill="#4A5568">INTERKONEKSI</text>');
-  out.push('<text x="80" y="91" text-anchor="middle" font-size="10.5" font-weight="600" font-family="JetBrains Mono,monospace" fill="' + impCol + '">' + impTxt + '</text>');
-  out.push('<line class="imp" x1="80" y1="96" x2="80" y2="112" stroke="#16233A" stroke-width="3"/>');
-  out.push('<rect class="brk" data-open="' + (impLost ? 1 : 0) + '" x="76" y="112" width="8" height="8" fill="' + (impLost ? '#F8E4E1' : '#FFFFFF') + '" stroke="' + (impLost ? '#C0392B' : '#16233A') + '" stroke-width="1.5"'
-    + (impLost ? ' transform="rotate(45 80 116)"' : '') + '/>');
-  if (impLost) out.push('<text class="openlab" x="80" y="107" text-anchor="middle" font-size="7.5" font-family="JetBrains Mono,monospace" fill="#C0392B" paint-order="stroke" stroke="#FFFFFF" stroke-width="3">TERBUKA</text>');
-  // sambungan bus
-  out.push('<line class="imp" x1="80" y1="120" x2="150" y2="120" stroke="#16233A" stroke-width="4"/>');
+  out.push('<rect class="imp" x="60" y="150" width="110" height="34" rx="7" fill="' + impBg + '" stroke="' + impCol + '"/>');
+  out.push('<text x="115" y="164" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" letter-spacing=".06em" fill="#4A5568">INTERKONEKSI</text>');
+  out.push('<text x="115" y="178" text-anchor="middle" font-size="12" font-weight="600" font-family="JetBrains Mono,monospace" fill="' + impCol + '">' + impTxt + '</text>');
+  out.push('<line class="imp" x1="115" y1="184" x2="115" y2="252" stroke="#16233A" stroke-width="3"/>');
+  out.push('<rect class="brk" data-open="' + (impLost ? 1 : 0) + '" x="111" y="252" width="8" height="8" fill="' + (impLost ? '#F8E4E1' : '#FFFFFF') + '" stroke="' + (impLost ? '#C0392B' : '#16233A') + '" stroke-width="1.5"'
+    + (impLost ? ' transform="rotate(45 115 256)"' : '') + '/>');
+  if (impLost) out.push('<text class="openlab" x="115" y="246" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" fill="#C0392B" paint-order="stroke" stroke="#FFFFFF" stroke-width="3">TERBUKA</text>');
 
-  /* ── generator (bawah bus): lingkaran + salib (×) + chip RPM/MW ── */
-  var gx = [250, 470, 690];
+  /* ── generator (bawah bus): lingkaran + salib (×) + chip SAMPING RPM/MW ── */
+  var gx = [170, 350, 530];
   gens.forEach(function (g, i) {
     var x = gx[i];
     var isOff = offline[g.id] === true;
-    out.push('<line x1="' + x + '" y1="120" x2="' + x + '" y2="144" stroke="#16233A" stroke-width="3"/>');
-    out.push('<circle class="gen" cx="' + x + '" cy="160" r="16" fill="#FFFFFF" stroke="' + (isOff ? '#C9CDD2' : '#16233A') + '" stroke-width="2"/>');
+    out.push('<line x1="' + x + '" y1="260" x2="' + x + '" y2="300" stroke="#16233A" stroke-width="3"/>');
+    out.push('<circle class="gen" cx="' + x + '" cy="322" r="22" fill="#FFFFFF" stroke="' + (isOff ? '#C9CDD2' : '#16233A') + '" stroke-width="2"/>');
     // salib × (simbol generator standar)
-    out.push('<line class="xc" x1="' + (x - 11) + '" y1="149" x2="' + (x + 11) + '" y2="171" stroke="' + (isOff ? '#C9CDD2' : '#16233A') + '" stroke-width="2"/>');
-    out.push('<line class="xc" x1="' + (x - 11) + '" y1="171" x2="' + (x + 11) + '" y2="149" stroke="' + (isOff ? '#C9CDD2' : '#16233A') + '" stroke-width="2"/>');
-    out.push('<text x="' + x + '" y="186" text-anchor="middle" font-size="10" font-family="Space Grotesk,sans-serif" font-weight="600" fill="#16233A">' + g.id + '</text>');
-    // chip: status + RPM + MW
+    out.push('<line class="xc" x1="' + (x - 15) + '" y1="307" x2="' + (x + 15) + '" y2="337" stroke="' + (isOff ? '#C9CDD2' : '#16233A') + '" stroke-width="2"/>');
+    out.push('<line class="xc" x1="' + (x - 15) + '" y1="337" x2="' + (x + 15) + '" y2="307" stroke="' + (isOff ? '#C9CDD2' : '#16233A') + '" stroke-width="2"/>');
+    out.push('<text x="' + x + '" y="364" text-anchor="middle" font-size="12" font-family="Space Grotesk,sans-serif" font-weight="600" fill="#16233A">' + g.id + '</text>');
+    // chip samping kanan: status + RPM + MW
     var rpm = isOff ? 0 : Math.round(120 * f / g.poles); // n = 120·f/P (P = kutub)
     var mw = isOff ? 0 : g.p0 + gov.resp[g.id];
     var sat = !isOff && g.govMax > g.p0 && gov.resp[g.id] >= g.govMax - g.p0 - 1e-9 && f < 50;
     var chipBg = isOff ? '#EEF0F2' : (sat ? '#F5E9DC' : '#E3F1E7');
     var chipBd = isOff ? '#C9CDD2' : (sat ? '#B5651D' : '#2E7D46');
-    out.push('<rect class="chip" cx-chip="' + x + '" x="' + (x - 58) + '" y="194" width="116" height="38" rx="7" fill="' + chipBg + '" stroke="' + chipBd + '"/>');
-    out.push('<text x="' + x + '" y="209" text-anchor="middle" font-size="11" font-weight="600" font-family="JetBrains Mono,monospace" fill="#16233A">' + (isOff ? 'TRIP' : 'RPM ' + rpm) + '</text>');
-    out.push('<text class="chipmw" x="' + x + '" y="224" text-anchor="middle" font-size="9.5" font-family="JetBrains Mono,monospace" fill="' + (isOff ? '#C9CDD2' : (sat ? '#8C4E16' : '#2E7D46')) + '">'
+    var cx = x + 93; // pusat chip
+    out.push('<rect class="chip" cx-chip="' + x + '" x="' + (x + 34) + '" y="296" width="118" height="44" rx="7" fill="' + chipBg + '" stroke="' + chipBd + '"/>');
+    out.push('<text x="' + cx + '" y="315" text-anchor="middle" font-size="12" font-weight="600" font-family="JetBrains Mono,monospace" fill="#16233A">' + (isOff ? 'TRIP' : 'RPM ' + rpm) + '</text>');
+    out.push('<text class="chipmw" x="' + cx + '" y="331" text-anchor="middle" font-size="11" font-family="JetBrains Mono,monospace" fill="' + (isOff ? '#C9CDD2' : (sat ? '#8C4E16' : '#2E7D46')) + '">'
       + (isOff ? '0 MW' : (sat ? Math.round(mw) + ' MW · maks gov' : Math.round(mw) + ' MW')) + '</text>');
   });
 
   /* ── feeder beban (atas bus): T1–T4 hijau + VITAL teal, garis solid ── */
-  var fx = [190, 330, 470, 610, 750];
+  var fx = [120, 225, 330, 435, 540];
   var fed = stages.map(function (s) { return { id: s.id, mw: Math.round((s.pct || 0) * p.loadMw) }; });
   fed.push({ id: 'V', mw: Math.round(p.loadMw * 0.5), vital: true });
   fed.forEach(function (fd, i) {
@@ -742,18 +785,17 @@ function renderSld(p, t, run) {
     var col = fd.vital ? '#13697A' : '#2E7D46';
     var bg  = fd.vital ? '#E0EFF1' : '#E3F1E7';
     var txt = fd.vital ? 'VITAL · ' + fd.mw + ' MW' : fd.id + ' · ' + fd.mw + ' MW';
-    out.push('<line x1="' + x + '" y1="120" x2="' + x + '" y2="82" stroke="' + col + '" stroke-width="3"/>');
-    out.push('<rect class="brk" data-open="' + (isOpen ? 1 : 0) + '" x="' + (x - 4) + '" y="74" width="8" height="8" fill="' + (isOpen ? '#F8E4E1' : '#FFFFFF') + '" stroke="' + (isOpen ? '#C0392B' : '#16233A') + '" stroke-width="1.5"'
-      + (isOpen ? ' transform="rotate(45 ' + x + ' 78)"' : '') + '/>');
-    out.push('<line x1="' + x + '" y1="74" x2="' + x + '" y2="46" stroke="' + col + '" stroke-width="3"/>');
-    if (isOpen) out.push('<text class="openlab" x="' + x + '" y="68" text-anchor="middle" font-size="7.5" font-family="JetBrains Mono,monospace" fill="#C0392B" paint-order="stroke" stroke="#FFFFFF" stroke-width="3">TERBUKA</text>');
+    out.push('<line x1="' + x + '" y1="72" x2="' + x + '" y2="252" stroke="' + col + '" stroke-width="3"/>');
+    out.push('<rect class="brk" data-open="' + (isOpen ? 1 : 0) + '" x="' + (x - 4) + '" y="244" width="8" height="8" fill="' + (isOpen ? '#F8E4E1' : '#FFFFFF') + '" stroke="' + (isOpen ? '#C0392B' : '#16233A') + '" stroke-width="1.5"'
+      + (isOpen ? ' transform="rotate(45 ' + x + ' 248)"' : '') + '/>');
+    if (isOpen) out.push('<text class="openlab" x="' + x + '" y="238" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" fill="#C0392B" paint-order="stroke" stroke="#FFFFFF" stroke-width="3">TERBUKA</text>');
     // panah aliran saat tertutup
     if (!isOpen) {
-      out.push('<path class="flow" d="M ' + (x - 4) + ' 96 l 8 0 l -4 -7 z" fill="' + col + '"/>');
-      out.push('<path class="flow" d="M ' + (x - 4) + ' 106 l 8 0 l -4 -7 z" fill="' + col + '"/>');
+      out.push('<path class="flow" d="M ' + (x - 4) + ' 150 l 8 0 l -4 -7 z" fill="' + col + '"/>');
+      out.push('<path class="flow" d="M ' + (x - 4) + ' 185 l 8 0 l -4 -7 z" fill="' + col + '"/>');
     }
-    out.push('<rect x="' + (x - 52) + '" y="18" width="104" height="28" rx="7" fill="' + bg + '" stroke="' + col + '"/>');
-    out.push('<text x="' + x + '" y="36" text-anchor="middle" font-size="9.5" font-family="JetBrains Mono,monospace" font-weight="600" fill="' + (fd.vital ? '#13697A' : '#2E7D46') + '">' + txt + '</text>');
+    out.push('<rect x="' + (x - 55) + '" y="36" width="110" height="36" rx="7" fill="' + bg + '" stroke="' + col + '"/>');
+    out.push('<text x="' + x + '" y="58" text-anchor="middle" font-size="11" font-family="JetBrains Mono,monospace" font-weight="600" fill="' + (fd.vital ? '#13697A' : '#2E7D46') + '">' + txt + '</text>');
   });
 
   return out.join('\n');
@@ -776,13 +818,13 @@ function renderFreq(p, run, t) {
     out.push('<line x1="38" y1="' + y + '" x2="666" y2="' + y + '" stroke="#E9EBE6" stroke-width="1"/>');
   }
   for (var fl = 47; fl <= 52; fl++) {
-    out.push('<text x="32" y="' + (fToY(fl) + 4).toFixed(1) + '" text-anchor="end" font-size="9.5" font-family="JetBrains Mono,monospace" fill="#4A5568">' + fl.toFixed(1) + '</text>');
+    out.push('<text x="32" y="' + (fToY(fl) + 4).toFixed(1) + '" text-anchor="end" font-size="10.5" font-family="JetBrains Mono,monospace" fill="#4A5568">' + fl.toFixed(1) + '</text>');
   }
   // grid x (2 s)
   for (var tt = 0; tt <= 12; tt += 2) {
     var x = tToX(tt).toFixed(1);
     out.push('<line x1="' + x + '" y1="12" x2="' + x + '" y2="226" stroke="#F0F1EC" stroke-width="1"/>');
-    out.push('<text x="' + x + '" y="240" text-anchor="middle" font-size="9.5" font-family="JetBrains Mono,monospace" fill="#4A5568">' + tt + 's</text>');
+    out.push('<text x="' + x + '" y="240" text-anchor="middle" font-size="10.5" font-family="JetBrains Mono,monospace" fill="#4A5568">' + tt + 's</text>');
   }
   // pita normal ±0.2 (50.2 → 49.8)
   var yHi = fToY(50.2), yLo = fToY(49.8);
@@ -793,7 +835,7 @@ function renderFreq(p, run, t) {
   (p.stages || []).forEach(function (st) {
     var yt = fToY(st.thr).toFixed(1);
     out.push('<line class="thr" x1="38" y1="' + yt + '" x2="666" y2="' + yt + '" stroke="#B5651D" stroke-width="1.3" stroke-dasharray="6 4"/>');
-    out.push('<text x="670" y="' + (parseFloat(yt) + 4).toFixed(1) + '" font-size="9" font-family="JetBrains Mono,monospace" font-weight="600" fill="#8C4E16">' + st.id + '</text>');
+    out.push('<text x="670" y="' + (parseFloat(yt) + 4).toFixed(1) + '" font-size="10.5" font-family="JetBrains Mono,monospace" font-weight="600" fill="#8C4E16">' + st.id + '</text>');
   });
   // kurva f(t)
   var pts = [];
@@ -807,7 +849,7 @@ function renderFreq(p, run, t) {
   if (run.ev && run.ev.length) {
     var xe = tToX(run.ev[0].t).toFixed(1);
     out.push('<line class="ev" x1="' + xe + '" x2="' + xe + '" y1="12" y2="226" stroke="#B5651D" stroke-width="1" stroke-dasharray="2 3"/>');
-    out.push('<text x="' + xe + '" y="10" text-anchor="middle" font-size="8.5" font-family="JetBrains Mono,monospace" fill="#B5651D">peristiwa</text>');
+    out.push('<text x="' + xe + '" y="13" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" fill="#B5651D">peristiwa</text>');
   }
   (run.tripSeq || []).forEach(function (tr) {
     if (tr.t > t + 1e-9) return;
@@ -818,7 +860,7 @@ function renderFreq(p, run, t) {
   var fNow = fAt(run, t);
   var xp = Math.min(tToX(Math.min(t, 12)).toFixed(1), 666);
   out.push('<line x1="' + xp + '" x2="' + xp + '" y1="12" y2="226" stroke="#1F4E8C" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>');
-  out.push('<text x="' + xp + '" y="238" text-anchor="middle" font-size="9" font-family="JetBrains Mono,monospace" fill="#1F4E8C">' + fNow.toFixed(2) + '</text>');
+  out.push('<text x="' + xp + '" y="238" text-anchor="middle" font-size="10.5" font-family="JetBrains Mono,monospace" fill="#1F4E8C">' + fNow.toFixed(2) + '</text>');
   return out.join('\n');
 }
 
@@ -826,20 +868,23 @@ function renderGauge(f) {
   var out = [];
   out.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 74 250">');
   out.push('<defs><linearGradient id="fg" x1="0" y1="0" x2="0" y2="1">');
-  out.push('<stop offset="0%" stop-color="#2E7D46"/>');
-  out.push('<stop offset="40%" stop-color="#2E7D46"/>'); // 50 Hz masih hijau
-  out.push('<stop offset="55%" stop-color="#B5651D"/>');
+  // plan-02 §4.4b: hijau HANYA di pita normal 50,2→49,8; over-frekuensi copper; bawah fade merah
+  out.push('<stop offset="0%" stop-color="#B5651D"/>');   // 52 Hz — over-frekuensi
+  out.push('<stop offset="36%" stop-color="#B5651D"/>'); // 50,2 Hz — batas atas pita normal
+  out.push('<stop offset="38%" stop-color="#2E7D46"/>'); // hijau mulai
+  out.push('<stop offset="44%" stop-color="#2E7D46"/>'); // 49,8 Hz — batas bawah pita normal
+  out.push('<stop offset="62%" stop-color="#B5651D"/>'); // transisi ke merah
   out.push('<stop offset="100%" stop-color="#C0392B"/>'); // 47 Hz merah
   out.push('</linearGradient></defs>');
   out.push('<rect x="30" y="12" width="18" height="214" rx="4" fill="url(#fg)"/>');
   for (var fg = 47; fg <= 52; fg++) {
     var y = fToY(fg).toFixed(1);
     out.push('<line x1="50" y1="' + y + '" x2="58" y2="' + y + '" stroke="#4A5568" stroke-width="1"/>');
-    out.push('<text x="64" y="' + (parseFloat(y) + 3).toFixed(1) + '" font-size="9" font-family="JetBrains Mono,monospace" fill="#4A5568">' + fg + '</text>');
+    out.push('<text x="64" y="' + (parseFloat(y) + 3).toFixed(1) + '" font-size="10" font-family="JetBrains Mono,monospace" fill="#4A5568">' + fg + '</text>');
   }
   var yp = fToY(Math.max(47, Math.min(52, f)));
   out.push('<line class="pt" x1="20" y1="' + yp.toFixed(1) + '" x2="30" y2="' + yp.toFixed(1) + '" stroke="#16233A" stroke-width="4" stroke-linecap="round"/>');
-  out.push('<text x="37" y="244" text-anchor="middle" font-size="10.5" font-weight="600" font-family="JetBrains Mono,monospace" fill="#16233A">' + f.toFixed(2) + ' Hz</text>');
+  out.push('<text x="37" y="244" text-anchor="middle" font-size="11" font-weight="600" font-family="JetBrains Mono,monospace" fill="#16233A">' + f.toFixed(2) + ' Hz</text>');
   out.push('</svg>');
   return out.join('\n');
 }
@@ -852,15 +897,15 @@ function renderVolt(run) {
     var v = vi / 100;
     var yv = (12 + (1.05 - v) / 0.2 * 152).toFixed(1);
     out.push('<line x1="38" y1="' + yv + '" x2="666" y2="' + yv + '" stroke="#E9EBE6" stroke-width="1"/>');
-    out.push('<text x="32" y="' + (parseFloat(yv) + 4).toFixed(1) + '" text-anchor="end" font-size="9.5" font-family="JetBrains Mono,monospace" fill="#4A5568">' + v.toFixed(2) + '</text>');
+    out.push('<text x="32" y="' + (parseFloat(yv) + 4).toFixed(1) + '" text-anchor="end" font-size="10.5" font-family="JetBrains Mono,monospace" fill="#4A5568">' + v.toFixed(2) + '</text>');
   }
   for (var tt = 0; tt <= 12; tt += 2) {
     var x = tToX(tt).toFixed(1);
-    out.push('<text x="' + x + '" y="184" text-anchor="middle" font-size="9.5" font-family="JetBrains Mono,monospace" fill="#4A5568">' + tt + 's</text>');
+    out.push('<text x="' + x + '" y="184" text-anchor="middle" font-size="10.5" font-family="JetBrains Mono,monospace" fill="#4A5568">' + tt + 's</text>');
   }
   // lantai 0.85
   out.push('<line class="floor" x1="38" y1="164" x2="666" y2="164" stroke="#C0392B" stroke-width="1" stroke-dasharray="6 4" opacity="0.7"/>');
-  out.push('<text x="670" y="168" text-anchor="end" font-size="8.5" font-family="JetBrains Mono,monospace" fill="#C0392B">lantai 0.85</text>');
+  out.push('<text x="670" y="168" text-anchor="end" font-size="10" font-family="JetBrains Mono,monospace" fill="#C0392B">lantai 0.85</text>');
   var pts = [];
   for (var i = 0; i < run.vs.length; i++) {
     if (run.ts[i] > 12) break;
@@ -988,9 +1033,10 @@ function renderGenList() {
   if (!el) return;
   var h = '';
   S.param.gens.forEach(function (g) {
-    h += '<div class="field"><label><span>' + g.id + ' — ' + g.label.split('— ')[1] + '</span>'
-      + '<b>' + g.p0 + ' MW</b></label>'
-      + '<div style="font-family:JetBrains Mono,monospace;font-size:10.5px;color:var(--ink-soft)">H ' + g.h.toFixed(1) + ' s · droop ' + Math.round(g.r * 100) + '% · kutub ' + g.poles
+    var label = g.label.split('— ')[1] || g.label;
+    h += '<div class="gencard"><div class="gencard-h"><span class="gdot"></span>'
+      + '<span class="gname">' + g.id + ' — ' + label + '</span><b>' + g.p0 + ' MW</b></div>'
+      + '<div class="gspec">H ' + g.h.toFixed(1) + ' s · droop ' + Math.round(g.r * 100) + '% · kutub ' + g.poles
       + ' · maks gov ' + g.govMax + ' MW</div></div>';
   });
   el.innerHTML = h;
@@ -1103,6 +1149,13 @@ function bind() {
   });
   if (el('tabKondisi')) el('tabKondisi').addEventListener('click', function () { setSideTab('kondisi'); });
   if (el('tabUrutan')) el('tabUrutan').addEventListener('click', function () { setSideTab('urutan'); });
+  // switch tampilan tengah (delegasi — kontainer tak pernah di-rebuild)
+  var vsw = el('vswitch');
+  if (vsw) vsw.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest ? e.target.closest('button[data-view]') : null;
+    if (!b) return;
+    setView(b.dataset.view);
+  });
   // tooltip ikon "?"
   document.addEventListener('pointerover', qTipHover);
   document.addEventListener('pointerout', qTipOut);
@@ -1171,6 +1224,22 @@ function syncCollapsedCentering() {
   }
 }
 
+/* ── switch tampilan tengah (plan-02 §4.2): SLD ↔ Grafik, tanpa sentuh run/playhead ── */
+function setView(v) {
+  S.ui.view = (v === 'graf') ? 'graf' : 'sld';
+  syncViewDom();
+}
+function syncViewDom() {
+  var vs = el('viewSld'), vg = el('viewGraf');
+  if (vs) vs.classList.toggle('hidden', S.ui.view !== 'sld');
+  if (vg) vg.classList.toggle('hidden', S.ui.view !== 'graf');
+  var btns = document.querySelectorAll('#vswitch button');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].className = btns[i].dataset.view === S.ui.view ? 'active' : '';
+  }
+  if (S.ui.view === 'sld') fitSld();
+}
+
 /* ── tab kartu kanan (isi penuh M3) ── */
 function setSideTab(tab) {
   S.ui.sideTab = tab;
@@ -1201,29 +1270,46 @@ function tick() {
   if (S.ui.playing) requestAnimationFrame(tick);
 }
 
-/* ── splash + fit SLD ── */
+/* ── splash AUTO (port seam Differential/Distance — plan-02 §4.5) ── */
 (function splash() {
   var sp = el('splash');
   if (!sp) return;
-  setTimeout(function () { sp.classList.add('go'); }, 120);
-  sp.addEventListener('click', function () {
-    if (sp.classList.contains('out')) return;
-    sp.classList.remove('go'); sp.classList.add('out');
+  var gone = false;
+  var t1 = setTimeout(function () { if (!gone) sp.classList.add('go'); }, 20);
+  var t2 = setTimeout(function () {
+    if (gone) return;
+    sp.classList.add('out');
     var rt = el('root'); if (rt) rt.classList.add('ready');
-  });
+  }, 1350);
+  var t3 = setTimeout(skip, 1860);
+  sp.addEventListener('click', skip);
+  function skip() {
+    if (gone) return;
+    gone = true;
+    clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
+    var rt = el('root'); if (rt) rt.classList.add('ready');
+    if (sp && sp.remove) sp.remove();
+  }
+  if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) { skip(); }
 })();
+/* fit SLD: skala min(w,h) terhadap viewBox 700×520 di dalam #viewSld (plan-02 §4.3) */
 function fitSld() {
-  var card = el('sldCard'), svg = el('sld');
-  if (!card || !svg) return;
-  var w = card.getBoundingClientRect().width - 28;
-  if (!(w > 100)) w = 900;
-  svg.setAttribute('width', w);
-  svg.setAttribute('height', w * 248 / 940);
+  var view = el('viewSld'), svg = el('sld');
+  if (!view || !svg) return;
+  var vbW = 700, vbH = 520;
+  var vw = view.getBoundingClientRect ? view.getBoundingClientRect().width : 0;
+  var vh = view.getBoundingClientRect ? view.getBoundingClientRect().height : 0;
+  var w = vw - 28, h = vh - 66; // minus padding kartu + judul/legenda
+  if (!(w > 100)) w = 700;
+  if (!(h > 100)) h = 520;
+  var s = Math.min(w / vbW, h / vbH);
+  svg.setAttribute('width', Math.round(vbW * s));
+  svg.setAttribute('height', Math.round(vbH * s));
 }
 if (typeof ResizeObserver !== 'undefined') {
   var ro = new ResizeObserver(function () { fitSld(); });
-  var cardEl = document.getElementById('sldCard');
-  if (cardEl) ro.observe(cardEl);
+  var viewEl = document.getElementById('viewSld');
+  if (viewEl) ro.observe(viewEl);
 }
 setTimeout(fitSld, 350);
 
@@ -1266,6 +1352,8 @@ var API = {
   syncCollapsedCentering: syncCollapsedCentering,
   collapsedStackH: collapsedStackH,
   setSideTab: setSideTab,
+  setView: setView,
+  syncViewDom: syncViewDom,
   qTipHover: qTipHover,
   qTipOut: qTipOut
 };
@@ -1274,6 +1362,7 @@ var API = {
 computeRun();
 bind();
 syncCollapseDom();
+syncViewDom();
 render();
 if (typeof document !== 'undefined' && document.getElementById && document.getElementById('root')) {
   var rt0 = document.getElementById('root');

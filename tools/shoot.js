@@ -25,9 +25,10 @@ const VIEW_W = 1500, VIEW_H = 1000;
 
 /* ── CDP session minimal ── */
 class CDP {
-  constructor(ws) { this.ws = ws; this.id = 0; this.pending = new Map();
+  constructor(ws) { this.ws = ws; this.id = 0; this.pending = new Map(); this.pageErrors = [];
     ws.addEventListener('message', (ev) => {
       const m = JSON.parse(ev.data);
+      if (m.method === 'Runtime.exceptionThrown') this.pageErrors.push(m.params.exceptionDetails.exception?.description || m.params.exceptionDetails.text || 'exception');
       if (m.id && this.pending.has(m.id)) { const { res, rej } = this.pending.get(m.id); this.pending.delete(m.id); m.error ? rej(new Error(m.error.message)) : res(m.result); }
     });
   }
@@ -95,9 +96,10 @@ async function waitReady(cdp) {
 }
 
 async function capture(cdp, name, setupExpr) {
+  cdp.pageErrors.length = 0;
   if (setupExpr) await evalJs(cdp, setupExpr);
   await new Promise(r => setTimeout(r, 120));
-  const metrics = await evalJs(cdp, `(() => {
+  const METRICS = `(() => {
     const rect = (sel) => { const el = document.querySelector(sel); if (!el) return null;
       const b = el.getBoundingClientRect();
       return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) }; };
@@ -108,17 +110,47 @@ async function capture(cdp, name, setupExpr) {
       }
     });
     const sldTag = document.getElementById('sldTag');
-    const sldSvg = document.getElementById('sld');
-    return {
+    const sldSvg = document.getElementById('sld');    return {
       inner: [window.innerWidth, window.innerHeight],
       doc: [document.documentElement.scrollWidth, document.documentElement.scrollHeight],
+      bodyScroll: document.documentElement.scrollHeight - window.innerHeight,
       fonts: { space: document.fonts.check('600 13px "Space Grotesk"'), mono: document.fonts.check('12px "JetBrains Mono"'), inter: document.fonts.check('14px "Inter"') },
       rects: {
         colP: rect('.l-p'), sld: rect('.sld-card'), tr: rect('.transport'),
         fch: rect('.chart-card'), vch: rect('.chart-card.v'), side: rect('.side-card'),
         sldsvg: rect('#sld'), scrub: rect('#scrub'), play: rect('#playBtn'),
-        fSvg: rect('#fSvg'), gauge: rect('#gauge'), gSvg: rect('#gauge svg'), vSvg: rect('#vSvg')
+        fSvg: rect('#fSvg'), gauge: rect('#gauge'), gSvg: rect('#gauge svg'), vSvg: rect('#vSvg'),
+        vswitch: rect('#vswitch'), viewSld: rect('#viewSld'), viewGraf: rect('#viewGraf')
+
       },
+      sldScale: sldSvg ? Math.round(parseFloat(sldSvg.getAttribute('width')) / 700 * 100) / 100 : null,
+      svgFontDetail: (() => {
+        const rows = [];
+        document.querySelectorAll('#sld, #fSvg, #vSvg, #gauge svg').forEach(svg => {
+          const r = svg.getBoundingClientRect();
+          const vbRaw = svg.getAttribute('viewBox');
+          const vbProp = svg.viewBox && svg.viewBox.baseVal ? svg.viewBox.baseVal.width : 'none';
+          const vb = (vbRaw || '').split(' ').map(Number);
+          const scale = vb[2] && r.width > 0 ? Math.round(r.width / vb[2] * 100) / 100 : 0;
+          rows.push((svg.id || 'gauge') + ':rect' + Math.round(r.width) + ':scale' + scale + ':vbRaw=' + JSON.stringify(vbRaw) + ':vbProp=' + vbProp);
+        });
+        return rows.join(' ');
+      })(),
+      minSvgFont: (() => {
+        // font EFEKTIF terkecil dari teks TERLIHAT (svg tersembunyi tidak dihitung)
+        let min = Infinity;
+        document.querySelectorAll('#sld, #fSvg, #vSvg, #gauge svg').forEach(svg => {
+          const r = svg.getBoundingClientRect();
+          if (!(r.width > 0)) return;
+          const vb = (svg.getAttribute('viewBox') || '').split(' ').map(Number);
+          const scale = vb[2] ? r.width / vb[2] : 1;
+          svg.querySelectorAll('text').forEach(t => {
+            const fs = parseFloat(t.getAttribute('font-size') || '0');
+            if (fs > 0) min = Math.min(min, fs * scale);
+          });
+        });
+        return min === Infinity ? null : Math.round(min * 100) / 100;
+      })(),
       transport: (() => { const t = document.querySelector('.transport'); if (!t) return null;
         const cs = getComputedStyle(t); return { h: Math.round(t.getBoundingClientRect().height), disp: cs.display }; })(),
       overflow: overflow.slice(0, 12),
@@ -129,9 +161,11 @@ async function capture(cdp, name, setupExpr) {
       chipMaks: (sldSvg ? (sldSvg.innerHTML.match(/maks gov/g) || []).length : -1),
       legend: document.querySelectorAll('#legend span').length,
       cards: [...document.querySelectorAll('.card[data-card]')].map(c => c.dataset.card + (c.classList.contains('collapsed') ? '✂' : '')),
-      state: (typeof S !== 'undefined') ? { scen: S.param.scenario.kind, tNow: S.ui.tNow, run: !!S.run, status: S.run ? S.run.status : null } : null
+      state: (typeof S !== 'undefined') ? { scen: S.param.scenario.kind, tNow: S.ui.tNow, run: !!S.run, status: S.run ? S.run.status : null, view: S.ui.view } : null
     };
-  })()`);
+  })()`;
+  const metrics = await evalJs(cdp, METRICS);
+  metrics.pageErrors = cdp.pageErrors.length;
   const lm = await cdp.send('Page.getLayoutMetrics');
   const { width, height } = lm.cssContentSize;
   const shot = await cdp.send('Page.captureScreenshot', {
@@ -273,20 +307,28 @@ async function main() {
     results.push(await capture(cdp, 'runtuh', setScen('runtuh', 5.5)));
     results.push(await capture(cdp, 'g1-end', setScen('g1', 25)));
     results.push(await capture(cdp, 'collapsed', `API.setAllCollapsed(true);`));
+    results.push(await capture(cdp, 'view-graf', `API.setAllCollapsed(false); API.setView('graf'); API.render();`));
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: 700, height: 1000, deviceScaleFactor: 1, mobile: false });
-    results.push(await capture(cdp, 'mobile', `API.setAllCollapsed(false); API.computeRun(); API.render();`));
+    results.push(await capture(cdp, 'mobile', `API.setView('sld'); API.setAllCollapsed(false); API.computeRun(); API.render();`));
+    // splash AUTO: muat ulang tanpa klik — tirai harus hilang sendiri ≤ 1,9 s (plan-02 §4.5)
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: VIEW_W, height: VIEW_H, deviceScaleFactor: 1, mobile: false });
+    await cdp.send('Page.navigate', { url: URL });
+    await new Promise(r => setTimeout(r, 2300));
+    results.push(await capture(cdp, 'splash-auto', `(typeof S !== 'undefined') && API.render();`));
     let rep = 'UFR simulator screenshot report\n';
     for (const r of results) {
       const m = r.metrics;
       rep += `\n== ${r.name} ==\n`;
-      rep += `  viewport ${m.inner.join('x')} · doc ${m.doc.join('x')}\n`;
+      rep += `  viewport ${m.inner.join('x')} · doc ${m.doc.join('x')} · bodyScroll=${m.bodyScroll}\n`;
       rep += `  fonts space=${m.fonts.space} mono=${m.fonts.mono} inter=${m.fonts.inter}\n`;
       for (const [k, v] of Object.entries(m.rects)) rep += `  ${k.padEnd(8)} ${v ? v.x + ',' + v.y + ' ' + v.w + 'x' + v.h : 'MISSING'}\n`;
       rep += `  transport h=${m.transport ? m.transport.h : 'MISSING'}px\n`;
-      rep += `  overflow: ${m.overflow.length ? JSON.stringify(m.overflow) : 'none'}\n`;
-      if (m.state) rep += `  state scen=${m.state.scen} t=${m.state.tNow} run=${m.state.run} status=${m.state.status}\n`;
+      rep += `  overflow: ${m.overflow.length ? JSON.stringify(m.overflow) : 'none'} · consoleErrors=${m.pageErrors}\n`;
+      if (m.state) rep += `  state scen=${m.state.scen} t=${m.state.tNow} run=${m.state.run} status=${m.state.status} view=${m.state.view}\n`;
       rep += `  tag="${m.tag}" · breakers open=${m.breakers} · TERBUKA=${m.tripLabels} · maks gov=${m.chipMaks} · legend=${m.legend}\n`;
       rep += `  cards: ${(m.cards || []).join(' ')}\n`;
+      rep += `  sldScale=${m.sldScale} · minSvgFont(effective)=${m.minSvgFont}\n`;
+      if (m.svgFontDetail) rep += `  svgFontDetail: ${m.svgFontDetail}\n`;
       if (m.sld) rep += `  sld svg ${m.sld.w}x${m.sld.h} text[:120]="${m.sld.text.slice(0, 120)}"\n`;
     }
     fs.writeFileSync(path.join(SHOTS, 'report.txt'), rep);

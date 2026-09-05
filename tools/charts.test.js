@@ -92,12 +92,14 @@ check('renderFreq: label sumbu y 47–52 Hz & x 0–12 s', () => {
 });
 
 /* ── renderGauge: batang gradien + penunjuk ── */
-check('gauge: gradien hijau→copper→merah dengan stop 0/40/55/100%', () => {
+check('gauge: hijau HANYA di zona 50 Hz — puncak copper (over-frekuensi), dasar merah (plan-02 §4.4b)', () => {
   const s = A.renderGauge(49.5);
   const stops = (s.match(/<stop /g) || []).length;
-  if (stops < 4) throw new Error('min 4 stop warna, dapat ' + stops);
-  if (!s.includes('offset="0%"') || !s.includes('#2E7D46')) throw new Error('puncak harus hijau');
-  if (!s.includes('offset="100%"') || !s.includes('#C0392B')) throw new Error('dasar harus merah');
+  if (stops < 5) throw new Error('min 5 stop warna, dapat ' + stops);
+  if (!s.includes('offset="0%"') || !s.includes('#B5651D')) throw new Error('puncak (52 Hz) harus copper, BUKAN hijau');
+  if (/offset="0%"[^>]*#2E7D46/.test(s)) throw new Error('stop 0% tidak boleh hijau');
+  if (!s.includes('offset="100%"') || !s.includes('#C0392B')) throw new Error('dasar (47 Hz) harus merah');
+  if (!s.includes('#2E7D46')) throw new Error('hijau harus ada di zona 50 Hz');
 });
 check('gauge: penunjuk f=49.5 di y=119 & nilai tertulis; f=50 → y=97.6', () => {
   const s50 = A.renderGauge(50);
@@ -133,6 +135,20 @@ check('tegangan: kurva V(t) non-kosong; run RUNTUH berakhir di lantai 0.85', () 
 });
 
 /* ── render master: grafik masuk ke DOM ── */
+/* ── floor tipografi kanvas (plan-02 §4.4) ── */
+check('font floor: semua font-size grafik & gauge >= 10 (plan-02)', () => {
+  for (const [name, svg] of [
+    ['freq', A.renderFreq(impP, impRun, 2.2)],
+    ['gauge', A.renderGauge(50)],
+    ['volt', A.renderVolt(impRun)]
+  ]) {
+    const sizes = [...svg.matchAll(/font-size="([0-9.]+)"/g)].map(m => parseFloat(m[1]));
+    if (!sizes.length) throw new Error(name + ': harus ada teks SVG');
+    const min = Math.min(...sizes);
+    if (min < 10) throw new Error(name + ' font terkecil ' + min + ' px < 10');
+  }
+});
+
 check('render() mengisi #fSvg, #gauge, #vSvg tanpa error', () => {
   A.render();
   const f = ctx.els.fSvg, g = ctx.els.gauge, v = ctx.els.vSvg;
