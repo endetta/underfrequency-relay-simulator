@@ -42,7 +42,7 @@ sepenuhnya berdiri sendiri (ADR-0001).
   AGC, headroom, defisit) & *Urutan pelepasan*
   (baris tiap trip: −MW nyata, t & f, beban sebelum→sesudah, total lepas).
 - Kartu kiri: preset sistem (mandiri / berimpor 400 MW), slider impor, ringkasan
-  generator & tahap UFLS + **catatan ambar PLN**, chip skenario (6 peristiwa di
+  generator & tahap UFLS + **catatan ambar PLN**, chip skenario (8 peristiwa di
   t=1,0 s), tentang model.
 
 ## Rantai model (PRD §5; detail U01 §7–8)
@@ -78,11 +78,11 @@ node tools/charts.test.js    # 21 asersi skala grafik/gauge/tegangan (incl. M10 
 node tools/ui.test.js        # 34 asersi seam desain & perilaku (incl. spasi transport↔SLD, M10 flex)
 node tools/snapshot.test.js  # 8 asersi snapshot keadaan sesaat (numerik lintas-permukaan)
 node tools/sim.test.js       # 6 asersi fasilitas run sim (cache, anti-stale, clamp playhead)
-node tools/plot.test.js      # 11 asersi ruang plot plotSpace (margin, kotak, sizeSvg)
+node tools/plot.test.js      # 13 asersi ruang plot plotSpace (margin, kotak, sizeSvg, rewiring M)
 node tools/shoot.js          # screenshot 9 view → tools/shots/ (+ zoom ASCII SLD)
 ```
 
-Total **165 asersi**, semuanya hijau di Node ≥ 22 (tanpa dependensi). `tools/shoot.js`
+Total **167 asersi**, semuanya hijau di Node ≥ 22 (tanpa dependensi). `tools/shoot.js`
 mengikuti pola CDP tanpa-npm proyek Differential (Chrome otomatis / `CHROME=/path`).
 
 ## Sumber & keputusan

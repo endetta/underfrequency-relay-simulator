@@ -907,7 +907,6 @@ var sim = {
     S.run = this._run;
     return this._run;
   },
-  p: function () { return this._fp ? JSON.parse(this._fp) : paramP(); },
   restart: function () {
     S.ui.playing = false; S.ui.tNow = 0;
     return this.run();
@@ -1105,7 +1104,7 @@ function voltY(v, H) { return plotSpace.voltY(v, H); }
 function renderFreq(p, run, t, dims) {
   var D = plotDims(dims, plotSpace.box.freq.w, plotSpace.box.freq.h);
   var W = D.w, H = D.h;
-  var R = W - 14, B = H - 24; // tepi kanan plot & bawah plot (47 Hz)
+  var R = W - plotSpace.M.right, B = H - plotSpace.M.bottomF; // tepi plot dari plotSpace (K3 — jangan literal margin)
   var out = [];
   out.push('<rect class="bg" x="0" y="0" width="' + W + '" height="' + H + '" fill="var(--surface)"/>');
   // grid y (0.5 Hz) + label
@@ -1189,7 +1188,7 @@ function renderGauge(f, dims) {
 function renderVolt(run, dims) {
   var D = plotDims(dims, plotSpace.box.volt.w, plotSpace.box.volt.h);
   var W = D.w, H = D.h;
-  var R = W - 14;
+  var R = W - plotSpace.M.right; // tepi kanan plot dari plotSpace (K3 — jangan literal margin)
   var out = [];
   out.push('<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="var(--surface)"/>');
   // skala pu 0.85–1.05 (0.05/langkah); voltY: atas 12, span penuh (H−38), bawah 26

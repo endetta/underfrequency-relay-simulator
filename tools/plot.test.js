@@ -101,5 +101,16 @@ check('rewire: fitSld baca plotSpace.box.sld & sizeSvg; API mengekspor plotSpace
   contains(src, 'plotSpace: plotSpace', 'ekspor API');
 });
 
+/* ── rewiring margin (temuan code-review): tepi plot TIDAK menulis ulang literal
+   14/24 — baca plotSpace.M.right / M.bottomF (drift M → renderer mustahil). ── */
+check('rewire M: renderFreq/renderVolt baca tepi kanan & bawah dari plotSpace.M', () => {
+  contains(src, 'plotSpace.M.right', 'tepi kanan baca M');
+  contains(src, 'plotSpace.M.bottomF', 'bawah plot freq baca M');
+});
+check('rewire M: tanpa literal margin (W−14 / H−24) di renderer grafik', () => {
+  if (src.includes('R = W - 14')) throw new Error('literal W−14 (M.right) harus dibaca dari plotSpace.M');
+  if (src.includes('B = H - 24')) throw new Error('literal H−24 (M.bottomF) harus dibaca dari plotSpace.M');
+});
+
 console.log(`\n${passed} lulus, ${failed} gagal`);
 process.exit(failed ? 1 : 0);
