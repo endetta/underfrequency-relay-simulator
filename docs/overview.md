@@ -74,7 +74,7 @@ Peristiwa yang dipicu t=1,0 s: Lepas G1/G2/G3 · Blok G3 · Lepas interkoneksi
 node tools/model.test.js     # 33 asersi literal (U01 §12 + hitung tangan)
 node tools/timeline.test.js  # 21 asersi (determinisme, parity, RUNTUH, jendela 0–30 s)
 node tools/sld.test.js       # 31 asersi geometri SLD (gen atas / beban bawah / CB 12×12 / kotak tak tumpuk / F1–F3 / M12)
-node tools/charts.test.js    # 19 asersi skala grafik/gauge/tegangan (incl. M10 adaptif tinggi)
+node tools/charts.test.js    # 21 asersi skala grafik/gauge/tegangan (incl. M10 adaptif, M14 label tak terpotong)
 node tools/ui.test.js        # 34 asersi seam desain & perilaku (incl. spasi transport↔SLD, M10 flex)
 node tools/snapshot.test.js  # 8 asersi snapshot keadaan sesaat (numerik lintas-permukaan)
 node tools/sim.test.js       # 6 asersi fasilitas run sim (cache, anti-stale, clamp playhead)
@@ -82,7 +82,7 @@ node tools/plot.test.js      # 11 asersi ruang plot plotSpace (margin, kotak, si
 node tools/shoot.js          # screenshot 9 view → tools/shots/ (+ zoom ASCII SLD)
 ```
 
-Total **163 asersi**, semuanya hijau di Node ≥ 22 (tanpa dependensi). `tools/shoot.js`
+Total **165 asersi**, semuanya hijau di Node ≥ 22 (tanpa dependensi). `tools/shoot.js`
 mengikuti pola CDP tanpa-npm proyek Differential (Chrome otomatis / `CHROME=/path`).
 
 ## Sumber & keputusan

@@ -1131,7 +1131,7 @@ function renderFreq(p, run, t, dims) {
   (p.stages || []).forEach(function (st) {
     var yt = fToY(st.thr, H).toFixed(1);
     out.push('<line class="thr" x1="38" y1="' + yt + '" x2="' + R + '" y2="' + yt + '" stroke="var(--copper)" stroke-width="1.3" stroke-dasharray="6 4"/>');
-    out.push('<text x="' + (W - 10) + '" y="' + (parseFloat(yt) + 4).toFixed(1) + '" font-size="10.5" font-family="JetBrains Mono,monospace" font-weight="600" fill="var(--copper-deep)">' + st.id + '</text>');
+    out.push('<text x="' + (W - 2) + '" y="' + (parseFloat(yt) + 4).toFixed(1) + '" text-anchor="end" font-size="10.5" font-family="JetBrains Mono,monospace" font-weight="600" fill="var(--copper-deep)">' + st.id + '</text>'); // M14: anchor-end x=W−2 → label tak terpotong tepi kanan (sebelumnya start di W−10 → melewati viewBox)
   });
   // kurva f(t)
   var pts = [];
@@ -1177,7 +1177,7 @@ function renderGauge(f, dims) {
   for (var fg = 47; fg <= 52; fg++) {
     var y = fToY(fg, H).toFixed(1);
     out.push('<line x1="50" y1="' + y + '" x2="58" y2="' + y + '" stroke="var(--ink-soft)" stroke-width="1"/>');
-    out.push('<text x="64" y="' + (parseFloat(y) + 3).toFixed(1) + '" font-size="10" font-family="JetBrains Mono,monospace" fill="var(--ink-soft)">' + fg + '</text>');
+    out.push('<text x="72" y="' + (parseFloat(y) + 3).toFixed(1) + '" text-anchor="end" font-size="10" font-family="JetBrains Mono,monospace" fill="var(--ink-soft)">' + fg + '</text>'); // M14: anchor-end x=72 (viewBox 74) → angka tak terpotong (sebelumnya start x=64 → meluber 2 px)
   }
   var yp = fToY(Math.max(47, Math.min(52, f)), H);
   out.push('<line class="pt" x1="20" y1="' + yp.toFixed(1) + '" x2="30" y2="' + yp.toFixed(1) + '" stroke="var(--ink)" stroke-width="4" stroke-linecap="round"/>');

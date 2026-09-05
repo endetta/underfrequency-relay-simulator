@@ -118,6 +118,12 @@ langsung di browser atau `python -m http.server`.
   0); (C) label Beban margin kanan 9,8 px → `x=668` (31,8 px ≈ konsisten dengan
   chip 32). Tes M12 baru di sld.test (**31 asersi**). Total **163 asersi**. Log:
   `design-plans/sesi-2026-09-05-13-…`.
+- **M14 (2026-09-05, teks grafik terpotong)**: audit CDP view Grafik — 10 teks
+  melewati tepi kanan viewBox SVG (terpotong `overflow:hidden`): tick gauge 52–47
+  start di `x=64` (→ 76 > viewBox 74, potong 2 px) & label tahap T1–T4 di `x=W−10`
+  (→ W+3, potong 2,6–3,3 px). Perbaiki: `text-anchor="end"` — gauge `x=72`, label
+  tahap `x=W−2`. Tes M14 baru di charts.test (**21 asersi**). Total **165 asersi**.
+  Log: `design-plans/sesi-2026-09-05-15-…`.
 
 ## Aturan umum workspace — SELF-CONTAINED (tidak perlu membaca CLAUDE.md/AGENTS.md di luar folder ini)
 

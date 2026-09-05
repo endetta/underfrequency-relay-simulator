@@ -67,6 +67,12 @@ check('renderFreq: 4 garis ambang putus-putus copper di y literal + label T1–T
   if (!s.includes('y1="183.2"') || !s.includes('y2="183.2"')) throw new Error('T4 (48.0) harus y=183.2'); // 12+4/5·214
   ['T1', 'T2', 'T3', 'T4'].forEach(id => { if (!s.includes('>' + id + '<')) throw new Error('label ' + id + ' hilang'); });
 });
+check('M14: label tahap T1–T4 anchor-end di x=W−2 (678 default) — tak terpotong tepi kanan svg', () => {
+  const s = A.renderFreq(impP, impRun, 2.2);
+  const count = (s.match(/<text x="678" y="[0-9.]+\" text-anchor="end"/g) || []).length;
+  if (count !== 4) throw new Error('4 label tahap harus x=678 anchor-end, dapat ' + count + ' → ' + (s.match(/<text x="[0-9]+" y="[0-9.]+"[^>]*>T[1-4]<\/text>/g) || []).join(' | '));
+  if (s.includes('x="670"')) throw new Error('x=670 (start) harus hilang → label terdorong ke kanan');
+});
 check('renderFreq: penanda peristiwa di t=1.0 (x=58.9) & trip T1 di t trip (x literal)', () => {
   const s = A.renderFreq(impP, impRun, 2.2);
   if (!s.includes('x1="58.9"') || !s.includes('x2="58.9"')) throw new Error('peristiwa t=1.0 → x=38+1/30·628=58.9');
@@ -117,6 +123,12 @@ check('gauge: tick 47–52 Hz', () => {
   for (const v of [47, 48, 49, 50, 51, 52]) {
     if (!s.includes('>' + v + '</text>')) throw new Error('tick ' + v + ' hilang');
   }
+});
+check('M14: tick gauge anchor-end x=72 (dalam viewBox 74) — angka tak terpotong tepi kanan', () => {
+  const s = A.renderGauge(50);
+  const m = s.match(/<text x="72" y="([0-9.]+)\" text-anchor="end"/g) || [];
+  if (m.length !== 6) throw new Error('6 tick harus x=72 anchor-end, dapat ' + m.length + ' → ' + m.join(' | '));
+  if (s.includes('x="64"')) throw new Error('x=64 (start) harus hilang → angka meluber lewat viewBox 74');
 });
 
 /* ── renderVolt: ilustratif, lantai 0.85, label wajib ── */
