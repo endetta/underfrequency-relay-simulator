@@ -1045,7 +1045,7 @@ function renderSld(p, t, run) {
     var col = fd.vital ? 'var(--teal)' : 'var(--green)';
     var bg  = fd.vital ? 'var(--teal-soft)' : 'var(--green-soft)';
     var idTxt = fd.vital ? 'VITAL' : fd.id;
-    out.push('<line x1="' + x + '" y1="260" x2="' + x + '" y2="392" stroke="' + col + '" stroke-width="3"/>');
+    out.push('<line x1="' + x + '" y1="260" x2="' + x + '" y2="400" stroke="' + col + '" stroke-width="3"/>'); // F1: garis MENYENTUH tepi atas kotak (y=400) — gap 8 px dihapus
     out.push('<rect class="brk" data-open="' + (isOpen ? 1 : 0) + '" x="' + (x - 6) + '" y="268" width="12" height="12" fill="' + (isOpen ? 'var(--red-soft)' : 'var(--surface)') + '" stroke="' + (isOpen ? 'var(--red)' : 'var(--ink)') + '" stroke-width="1.5"'
       + (isOpen ? ' transform="rotate(45 ' + x + ' 274)"' : '') + '/>');
     if (isOpen) out.push('<text class="openlab" x="' + x + '" y="298" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" fill="var(--red)" paint-order="stroke" stroke="var(--surface)" stroke-width="3">TERBUKA</text>');

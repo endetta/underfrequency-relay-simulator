@@ -59,6 +59,14 @@ langsung di browser atau `python -m http.server`.
   `svgBox()` guard default saat tersembunyi/stub; re-render saat resize (`rg`
   observe `#viewGraf`) & saat switch ke Grafik. Tes M10: charts 19 · ui 34 (total
   131). Log: `design-plans/sesi-2026-09-05-06-…`.
+- **M11 (2026-09-05, audit improve-ui → SLD UX F1)**: hasil audit terukur (probe CDP:
+  gap 8,0 px garis feeder↔kotak; gap 6,0 px chip↔lingkaran; margin kanan 18 px;
+  void vertikal 90 px — zero-overlap bertahan) → 3 plan eksekusi di `design-plans/`
+  (plan-04/05/06, status DRAF→SELESAI). **F1 (plan-04)**: garis feeder kini
+  **menyentuh tepi atas kotak** (`y2="400"`, sebelumnya 392 → garis menggantung
+  8 px); 2 asersi M8 di sld.test diperbarui via TDD (merah→hijau); probe gap=0
+  di semua 5 feeder. Log: `design-plans/sesi-2026-09-05-10-…`.
+  Lanjutan: F2 (plan-05) & F3 (plan-06) menunggu eksekusi.
 - **Refactor arsitektur (2026-09-05, hasil review arsitektur)**: modul dalam
   **`snapshot(p, run, t)`** (§12b) = SATU-SATUNYA interpretasi keadaan sesaat untuk
   presentasi: f, status, fase kendali (governor→AGC→UFLS), trips/shedTotal, loadNow,
@@ -132,7 +140,7 @@ jangan diedit tanpa izin. Bila ragu proyek mana yang dimaksud user: tanyakan.
   (template `design-plans/sesi-TEMPLATE.md`): waktu mulai + commit sebelum → kegiatan
   & hasil (ringkas, dgn bukti tes/angka) → status → langkah berikutnya. Perbarui juga
   status header `design-plans/plan-*.md` yang dipakai (DRAF → DIEKSEKUSI → SELESAI).
-- Riwayat terbaru: `sesi-2026-09-05-08` (K2: fasilitas run sim) → `sesi-2026-09-05-07` (refactor snapshot keadaan sesaat) → `sesi-2026-09-05-06` (M10: grafik mengisi kolom — renderer adaptif dims) → `sesi-2026-09-05-05` (M9: audit overlap SLD — kotak feeder tak lagi tumpuk) → `sesi-2026-09-05-04` (M8: bug play + rombak SLD) → `sesi-2026-09-05-03` (M7: temuan code-review) → `sesi-2026-09-05-02` (plan-03 M6: AGC + player real-time + jendela 30 s).
+- Riwayat terbaru: `sesi-2026-09-05-10` (M11 F1: garis feeder tersambung) → `sesi-2026-09-05-09` (K3: plotSpace) → `sesi-2026-09-05-08` (K2: fasilitas run sim) → `sesi-2026-09-05-07` (refactor snapshot keadaan sesaat) → `sesi-2026-09-05-06` (M10: grafik mengisi kolom — renderer adaptif dims) → `sesi-2026-09-05-05` (M9: audit overlap SLD — kotak feeder tak lagi tumpuk) → `sesi-2026-09-05-04` (M8: bug play + rombak SLD) → `sesi-2026-09-05-03` (M7: temuan code-review) → `sesi-2026-09-05-02` (plan-03 M6: AGC + player real-time + jendela 30 s).
   Sebelumnya: `sesi-2026-09-05-01` (audit improve-ui → eksekusi M5, plan-02 SELESAI).
 - **Sesi/AI baru mulai dari:** file ini → log sesi terbaru → plan ber-status DRAF/BELUM
   → kerjakan lanjutannya. Riwayat & arah tersimpan di file — jangan eksplorasi ulang.

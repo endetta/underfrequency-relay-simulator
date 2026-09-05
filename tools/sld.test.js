@@ -61,9 +61,9 @@ check('baseline: interkoneksi 400 MW berlabel, beban 1100 MW, vital teal tersamb
   if (!s.includes('>VITAL<')) throw new Error('baris 1 vital harus berisi VITAL');
   if (!s.includes('>550 MW<')) throw new Error('baris 2 vital harus berisi 550 MW');
   if (s.includes('VITAL · 550 MW')) throw new Error('label satu baris "VITAL · 550 MW" harus dihapus (M8)');
-  // garis vital (teal) harus menempel bus dan turun ke kotak feeder (M8: beban di BAWAH bus)
-  if (!s.includes('x1="540" y1="260" x2="540" y2="392" stroke="var(--teal)"')) {
-    throw new Error('feeder vital harus tersambung solid dari bus ke bawah dengan warna teal (var(--teal))');
+  // garis vital (teal) harus menempel bus dan turun MENYENTUH kotak feeder (M8: beban di BAWAH bus; F1: y2=400)
+  if (!s.includes('x1="540" y1="260" x2="540" y2="400" stroke="var(--teal)"')) {
+    throw new Error('feeder vital harus tersambung solid dari bus ke tepi kotak dengan warna teal (var(--teal))');
   }
   if (count(s, 'stroke="var(--teal)"') < 2) throw new Error('vital harus bergaris teal');
 });
@@ -144,10 +144,11 @@ check('M8: generator di ATAS bus — lingkaran cy=170 (di atas bus 260), garis n
   if (count(s, 'y2="192"') !== 3) throw new Error('garis tiap generator harus naik dari bus (260) ke lingkaran (y2=192)');
   if (s.includes('y2="300"')) throw new Error('generator TIDAK boleh lagi di bawah bus');
 });
-check('M8: beban di BAWAH bus — kotak feeder y=400, garis turun 260→392', () => {
+check('M8+F1: beban di BAWAH bus — kotak feeder y=400, garis turun 260→400 MENYENTUH kotak (gap 8 px hilang)', () => {
   const s = renderAt(baseP, baseRun, 0);
   if (count(s, 'y="400"') !== 5) throw new Error('5 kotak feeder harus di bawah bus (y=400), dapat ' + count(s, 'y="400"'));
-  if (count(s, 'y2="392"') !== 5) throw new Error('garis tiap feeder harus turun dari bus (260) ke kotak (y2=392)');
+  if (count(s, 'y2="400"') !== 5) throw new Error('garis tiap feeder harus turun dari bus (260) ke tepi kotak (y2=400), dapat ' + count(s, 'y2="400"'));
+  if (s.includes('y2="392"')) throw new Error('gap 8 px (garis 392, kotak 400) harus dihapus (F1)');
   if (s.includes('y="36"')) throw new Error('feeder TIDAK boleh lagi di atas bus');
 });
 check('M8: label feeder dua baris tanpa overlap — id di baris 1, MW di baris 2 (semua 1100 MW)', () => {
