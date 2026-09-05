@@ -107,6 +107,15 @@ mengerucut di sini — renderer/handler cukup mengubah param lalu memanggil
 `render()`, yang selalu melewati `sim.run()` sehingga run tak pernah basi.
 _Avoid_: facade, state manager, store
 
+**Ruang plot (plotSpace)** :
+Modul skala & margin SATU-satunya untuk kanvas SVG: tabel margin (atas 12 /
+kiri 38 / kanan 14 / bawah 24 & 26), tabel kotak desain (freq 680×250, gauge
+74×250, volt 680×190, SLD 700×520), pemetaan `fToY/tToX/voltY`, dan `sizeSvg`
+(ukur elemen → dims, guard default saat tersembunyi). Renderer grafik + `fitSld`
+HANYA membaca dari sini — jangan tulis ulang angka margin/kotak di tempat lain
+(duplikasi = drift renderer↔dokumen↔tes).
+_Avoid_: layout constants, magic numbers, plot box
+
 **Diagram satu garis (SLD)** :
 Kanvas utama simulator: unit pembangkit → bus → feeder beban dengan pemutus;
 menampilkan status & aliran daya secara langsung.

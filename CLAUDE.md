@@ -78,6 +78,16 @@ langsung di browser atau `python -m http.server`.
   `ufTimeline`/`paramP` langsung di handler UI — lewat `sim`. Suite baru
   `tools/sim.test.js` (6 asersi). Total 145 asersi. Log:
   `design-plans/sesi-2026-09-05-08-…`.
+- **Refactor arsitektur #3 (2026-09-05, K3)**: modul **`plotSpace`** (§12c) =
+  satu sumber skala & margin untuk SLD + grafik: tabel `M` (12/38/14/24/26),
+  tabel `box` (freq 680×250, gauge 74×250, volt 680×190, sld 700×520), pemetaan
+  `fToY/tToX/voltY` konsisten dengan M, `sizeSvg(el,dw,dh)` (ukur → dims, guard
+  default). `fToY/tToX/plotDims/voltY` jadi delegasi; renderer baca
+  `plotSpace.box.*`; `fitSld` baca `plotSpace.box.sld` + `sizeSvg` — perilaku
+  identik (sldScale ≥ 1,0 tetap teruji shoot). **Jangan tulis ulang angka
+  margin/kotak di tempat lain** — baca dari plotSpace. Suite baru
+  `tools/plot.test.js` (11 asersi). Total 156 asersi. Log:
+  `design-plans/sesi-2026-09-05-09-…`.
 
 ## Aturan umum workspace — SELF-CONTAINED (tidak perlu membaca CLAUDE.md/AGENTS.md di luar folder ini)
 
@@ -187,6 +197,7 @@ node tools/charts.test.js    # skala grafik/gauge/tegangan (literal)
 node tools/ui.test.js        # seam desain + transport kompak + kartu kanan
 node tools/snapshot.test.js  # snapshot keadaan sesaat (numerik, lintas-permukaan)
 node tools/sim.test.js       # fasilitas run sim (cache, anti-stale, clamp playhead)
+node tools/plot.test.js      # ruang plot plotSpace (margin, kotak, sizeSvg)
 node tools/shoot.js          # screenshot semua view → tools/shots/ + report.txt
 ```
 

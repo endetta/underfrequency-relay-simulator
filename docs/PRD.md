@@ -302,4 +302,6 @@ Tidak ada auth/Clerk di v1 (keputusan Round 1). Bahasa UI/dokumen = Indonesia.
    pita normal ±0,2 Hz, ambang UFLS putus-putus copper berlabel T1–T4, penanda
    peristiwa (t = 1,0 s) & trip (lingkaran merah) sampai playhead. Nilai = skala
    **desain** kotak 680×250; renderer (M10) menskalakan vertikal ke tinggi kartu
-   nyata (margin tetap: atas 12 / bawah 24 Hz, 26 V), lihat §4.4.
+   nyata (margin tetap: atas 12 / bawah 24 Hz, 26 V), lihat §4.4. Sumber angka
+   di KODE = modul `plotSpace` (§12c, diuji `tools/plot.test.js`) — jangan
+   mengubah literal di sini tanpa amendemen PRD + plotSpace serentak.

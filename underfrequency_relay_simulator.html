@@ -1068,23 +1068,42 @@ function renderSld(p, t, run) {
   return out.join('\n');
 }
 
+/* ═══════════════ 12c. Ruang plot (plotSpace) — SATU sumber skala & margin (K3) ═══════════════
+   Margin (atas 12 / kiri 38 / kanan 14 / bawah 24 & 26) + kotak desain (freq
+   680×250, gauge 74×250, volt 680×190, sld 700×520) + pemetaan fToY/tToX/voltY
+   + sizeSvg (ukur elemen → dims, guard default saat tersembunyi/stub). Konsumen:
+   renderFreq/renderGauge/renderVolt, render*Into, fitSld — JANGAN tulis ulang
+   angka margin/kotak di tempat lain (duplikasi = drift renderer↔dokumen↔tes). */
+var plotSpace = {
+  M: { top: 12, left: 38, right: 14, bottomF: 24, bottomV: 26 },
+  box: { freq: { w: 680, h: 250 }, gauge: { w: 74, h: 250 }, volt: { w: 680, h: 190 }, sld: { w: 700, h: 520 } },
+  fToY: function (f, H) { H = H || this.box.freq.h; return this.M.top + (52 - f) / 5 * (H - this.M.top - this.M.bottomF); },
+  tToX: function (t, W) { W = W || this.box.freq.w; return this.M.left + t / 30 * (W - this.M.left - this.M.right); },
+  voltY: function (v, H) { H = H || this.box.volt.h; return this.M.top + (1.05 - v) / 0.2 * (H - this.M.top - this.M.bottomV); },
+  dims: function (dims, dw, dh) { dims = dims || {}; return { w: dims.w || dw, h: dims.h || dh }; },
+  sizeSvg: function (el, dw, dh) {
+    var w = el.clientWidth, h = el.clientHeight;
+    if (!(w > 40)) w = dw;
+    if (!(h > 40)) h = dh;
+    return { w: Math.round(w), h: Math.round(h) };
+  }
+};
+
 /* ═══════════════ 13b. Renderer grafik (murni, diuji tools/charts.test.js) ═══════════════
    Skala literal (kotak DESAIN, tanpa dims): jendela 0–30 s; frekuensi 47–52 Hz
    dengan y(f) = 12 + (52−f)/5·214 dan x(t) = 38 + t/30·628 — suite M2 memakai
-   angka itu apa adanya. M10: fungsi menerima {w,h} dari ukuran NYATA kartu →
-   plot mengisi tinggi kolom tengah (tanpa void bawah); margin tetap: kiri 38
-   (label Hz), kanan 14 (label tahap), atas 12, bawah 24 (label waktu) / 26 (volt).
+   angka itu apa adanya (sumber angka kini di plotSpace §12c). M10: fungsi
+   menerima {w,h} dari ukuran NYATA kartu → plot mengisi tinggi kolom tengah
+   (tanpa void bawah); margin tetap: kiri 38 (label Hz), kanan 14 (label tahap),
+   atas 12, bawah 24 (label waktu) / 26 (volt).
    Kelas kunci utk tes: .band, .thr, .ev, .trip, .floor (lantai), .pt (penunjuk). */
-function fToY(f, H) { H = H || 250; return 12 + (52 - f) / 5 * (H - 36); } // 36 = margin 12+24
-function tToX(t, W) { W = W || 680; return 38 + t / 30 * (W - 52); }      // 52 = margin 38+14
-function plotDims(dims, dw, dh) {
-  dims = dims || {};
-  return { w: dims.w || dw, h: dims.h || dh };
-}
-function voltY(v, H) { return 12 + (1.05 - v) / 0.2 * (H - 38); } // 38 = margin 12+26
+function fToY(f, H) { return plotSpace.fToY(f, H); } // delegasi — angka sumber di plotSpace
+function tToX(t, W) { return plotSpace.tToX(t, W); }
+function plotDims(dims, dw, dh) { return plotSpace.dims(dims, dw, dh); }
+function voltY(v, H) { return plotSpace.voltY(v, H); }
 
 function renderFreq(p, run, t, dims) {
-  var D = plotDims(dims, 680, 250);
+  var D = plotDims(dims, plotSpace.box.freq.w, plotSpace.box.freq.h);
   var W = D.w, H = D.h;
   var R = W - 14, B = H - 24; // tepi kanan plot & bawah plot (47 Hz)
   var out = [];
@@ -1141,7 +1160,7 @@ function renderFreq(p, run, t, dims) {
 }
 
 function renderGauge(f, dims) {
-  var D = plotDims(dims, 74, 250);
+  var D = plotDims(dims, plotSpace.box.gauge.w, plotSpace.box.gauge.h);
   var H = D.h; // lebar desain tetap 74 (label & pointer di kanan bar)
   var out = [];
   out.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 74 ' + H + '">');
@@ -1168,7 +1187,7 @@ function renderGauge(f, dims) {
 }
 
 function renderVolt(run, dims) {
-  var D = plotDims(dims, 680, 190);
+  var D = plotDims(dims, plotSpace.box.volt.w, plotSpace.box.volt.h);
   var W = D.w, H = D.h;
   var R = W - 14;
   var out = [];
@@ -1199,30 +1218,24 @@ function renderVolt(run, dims) {
   return out.join('\n');
 }
 
-function svgBox(el, dw, dh) {
-  var w = el.clientWidth, h = el.clientHeight;
-  if (!(w > 40)) w = dw;
-  if (!(h > 40)) h = dh;
-  return { w: Math.round(w), h: Math.round(h) };
-}
 function renderFreqInto() {
   var el = document.getElementById('fSvg');
   if (!el || !S.run) return;
-  var b = svgBox(el, 680, 250);
+  var b = plotSpace.sizeSvg(el, plotSpace.box.freq.w, plotSpace.box.freq.h);
   el.setAttribute('viewBox', '0 0 ' + b.w + ' ' + b.h);
   el.innerHTML = renderFreq(paramP(), S.run, S.ui.tNow, { w: b.w, h: b.h });
 }
 function renderGaugeInto() {
   var el = document.getElementById('gauge');
   if (!el || !S.run) return;
-  var b = svgBox(el, 74, 250);
-  if (b.w > 74) b.w = 74; // gauge tetap selebar desain 74 px
+  var b = plotSpace.sizeSvg(el, plotSpace.box.gauge.w, plotSpace.box.gauge.h);
+  if (b.w > plotSpace.box.gauge.w) b.w = plotSpace.box.gauge.w; // gauge tetap selebar desain
   el.innerHTML = renderGauge(fAt(S.run, S.ui.tNow), { w: b.w, h: b.h });
 }
 function renderVoltInto() {
   var el = document.getElementById('vSvg');
   if (!el || !S.run) return;
-  var b = svgBox(el, 680, 190);
+  var b = plotSpace.sizeSvg(el, plotSpace.box.volt.w, plotSpace.box.volt.h);
   el.setAttribute('viewBox', '0 0 ' + b.w + ' ' + b.h);
   el.innerHTML = renderVolt(S.run, { w: b.w, h: b.h });
 }
@@ -1643,16 +1656,17 @@ function tick(now) {
   }
   if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) { skip(); }
 })();
-/* fit SLD: skala min(w,h) terhadap viewBox 700×520 di dalam #viewSld (plan-02 §4.3) */
+/* fit SLD: skala min(w,h) terhadap viewBox 700×520 di dalam #viewSld (plan-02 §4.3).
+   Angka kotak dari plotSpace §12c; ukur view via sizeSvg (clientWidth/Height —
+   #viewSld overflow:hidden tanpa border → identik dengan getBoundingClientRect). */
 function fitSld() {
   var view = el('viewSld'), svg = el('sld');
   if (!view || !svg) return;
-  var vbW = 700, vbH = 520;
-  var vw = view.getBoundingClientRect ? view.getBoundingClientRect().width : 0;
-  var vh = view.getBoundingClientRect ? view.getBoundingClientRect().height : 0;
-  var w = vw - 28, h = vh - 66; // minus padding kartu + judul/legenda
-  if (!(w > 100)) w = 700;
-  if (!(h > 100)) h = 520;
+  var vbW = plotSpace.box.sld.w, vbH = plotSpace.box.sld.h;
+  var b = plotSpace.sizeSvg(view, vbW, vbH);
+  var w = b.w - 28, h = b.h - 66; // minus padding kartu + judul/legenda
+  if (!(w > 100)) w = vbW;
+  if (!(h > 100)) h = vbH;
   var s = Math.min(w / vbW, h / vbH);
   svg.setAttribute('width', Math.round(vbW * s));
   svg.setAttribute('height', Math.round(vbH * s));
@@ -1691,6 +1705,7 @@ var API = {
   setAgc: setAgc,
   fToY: fToY,
   tToX: tToX,
+  plotSpace: plotSpace,
   renderTransport: renderTransport,
   fAt: fAt,
   nearlyEqual: nearlyEqual,
