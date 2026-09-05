@@ -25,6 +25,9 @@ sepenuhnya berdiri sendiri (ADR-0001).
   **terpisah (tanpa tumpuk, M9)**; pemutus kotak **12×12** lurus (tertutup) vs
   **miring 45° + label TERBUKA** (terbuka); chip AGC saat kendali sekunder bekerja;
   legenda 5 item warna dibedakan. TIDAK ada garis putus-putus di jalur daya.
+- **Interpretasi satu sumber**: modul `snapshot(p, run, t)` menurunkan keadaan
+  sesaat (f, status, fase kendali, trip/shed, beban, defisit, state unit) untuk
+  SLD, tag status & kartu kanan — renderer hanya memformat, tak menghitung ulang.
 - **Transport kompak** (≤ 40 px): ▶/❚❚ · 0,5×/1×/2× · scrubber · t · Reset.
 - **Grafik frekuensi** (0–30 s, 47–52 Hz): pita normal ±0,2 Hz hijau, garis 50 Hz,
   ambang UFLS putus-putus copper berlabel T1–T4, penanda peristiwa (t=1,0 s) & trip,
@@ -73,10 +76,11 @@ node tools/timeline.test.js  # 21 asersi (determinisme, parity, RUNTUH, jendela 
 node tools/sld.test.js       # 24 asersi geometri SLD (gen atas / beban bawah / CB 12×12 / kotak tak tumpuk)
 node tools/charts.test.js    # 19 asersi skala grafik/gauge/tegangan (incl. M10 adaptif tinggi)
 node tools/ui.test.js        # 34 asersi seam desain & perilaku (incl. spasi transport↔SLD, M10 flex)
+node tools/snapshot.test.js  # 8 asersi snapshot keadaan sesaat (numerik lintas-permukaan)
 node tools/shoot.js          # screenshot 9 view → tools/shots/ (+ zoom ASCII SLD)
 ```
 
-Total **131 asersi**, semuanya hijau di Node ≥ 22 (tanpa dependensi). `tools/shoot.js`
+Total **139 asersi**, semuanya hijau di Node ≥ 22 (tanpa dependensi). `tools/shoot.js`
 mengikuti pola CDP tanpa-npm proyek Differential (Chrome otomatis / `CHROME=/path`).
 
 ## Sumber & keputusan

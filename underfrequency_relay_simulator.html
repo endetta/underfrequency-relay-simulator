@@ -892,6 +892,65 @@ function paramP() { // P untuk mesin murni (skenario + fNom/tMax/tEvent + AGC)
 }
 function computeRun() { S.run = ufTimeline(paramP()); if (S.ui.tNow > S.run.tMax) S.ui.tNow = 0; }
 
+/* ═══════════════ 12b. Snapshot keadaan sesaat — SATU-SATUNYA interpretasi presentasi ═══════════════
+   (p, run, t) → satu objek polos {f, status, phase, collapse, trips, shedTotal,
+   loadNow, impNow, impLost, deficit, agcDisp, rocof0, gov, gen[]}. Dipakai oleh
+   renderSld, tag #sldTag, dan kartu kanan — JANGAN menghitung ulang turunan ini
+   di renderer (duplikasi pola M7). Semua semantik dari mesin: scenarioDelta /
+   effGens / ufGovernorAt / satDevOf (via gov.resp == headroom) / ufStatus /
+   collapseAt / fAt. `sat` ekuivalen dgn batas jenuh solver f ≤ 50 + satDevOf(g). */
+function snapshot(p, run, t) {
+  var d = scenarioDelta(p.scenario || { kind: 'none' });
+  var offIds = {};
+  if (d.genOff) offIds[d.genOff] = true;
+  var f = 50, trips = [], agcStepsDone = [], rocof0 = 0;
+  if (run) {
+    f = fAt(run, t);
+    trips = run.tripSeq.filter(function (x) { return x.t <= t + 1e-9; });
+    agcStepsDone = (run.agcSteps || []).filter(function (s) { return s.t <= t + 1e-9; });
+    if (run.ev && run.ev.length) rocof0 = run.ev[0].rocof0 || 0;
+  }
+  var shedTotal = trips.reduce(function (a, x) { return a + x.mw; }, 0);
+  var loadNow = p.loadMw + d.loadAdd - shedTotal;
+  var impLost = d.impLost === true;
+  var impNow = impLost ? 0 : p.importMw;
+  var eff = effGens(p);
+  var gov = ufGovernorAt(eff, f);
+  var deficit = loadNow - gov.sup - impNow;
+  var collapse = collapseAt(run, t);
+  var status = ufStatus(f, { trips: trips.length, collapse: collapse });
+  var agcDisp = agcStepsDone.reduce(function (a, s) { return a + s.mw; }, 0);
+  // kumulatif setpoint AGC per unit sampai playhead = langkah terakhir yg sudah terjadi
+  var agcCum = {};
+  for (var ai = agcStepsDone.length - 1; ai >= 0; ai--) {
+    if (agcStepsDone[ai].cum) { agcCum = agcStepsDone[ai].cum; break; }
+  }
+  // unit: seluruh p.gens (off = lepas skenario); sat = resp == headroom (batas satDevOf)
+  var gen = eff.map(function (g) {
+    var off = offIds[g.id] === true;
+    var hr = Math.max(0, g.govMax - g.p0);
+    var agcMw = off ? 0 : (agcCum[g.id] || 0);
+    var mw = off ? 0 : g.p0 + gov.resp[g.id] + agcMw;
+    if (!off && g.govMax > g.p0) mw = Math.min(mw, g.govMax);
+    var sat = !off && g.govMax > g.p0 && gov.resp[g.id] >= hr - 1e-9 && f < 50;
+    return { id: g.id, poles: g.poles, off: off, sat: sat, agcMw: agcMw, mwFinal: mw };
+  });
+  // fase kendali GOVERNOR → AGC → UFLS (indikator kartu kanan)
+  var lastAgc = agcStepsDone.length ? agcStepsDone[agcStepsDone.length - 1].t : -1;
+  var lastTrip = trips.length ? trips[trips.length - 1].t : -1;
+  var phase = 'idle';
+  if (collapse || (status === 'PELEPASAN BEBAN' && lastTrip >= lastAgc)) phase = 'ufls';
+  else if (lastAgc >= 0 && lastAgc >= lastTrip) phase = 'agc';
+  else if (lastTrip >= 0 && lastTrip > lastAgc) phase = 'ufls';
+  else if (!trips.length && Math.abs(f - 50) > 1e-9) phase = 'governor';
+  return {
+    f: f, status: status, phase: phase, collapse: collapse,
+    trips: trips, shedTotal: shedTotal, loadNow: loadNow,
+    impNow: impNow, impLost: impLost, deficit: deficit,
+    agcDisp: agcDisp, rocof0: rocof0, gov: gov, gen: gen
+  };
+}
+
 /* ═══════════════ 13. Renderer SLD (murni, diuji tools/sld.test.js) ═══════════════
    Kelas kunci utk tes: .bus (bar), .xc (garis silang generator), .gen (lingkaran),
    .chip (chip RPM/MW), .brk (pemutus; data-open=1 saat terbuka/rotasi 45°),
@@ -899,27 +958,13 @@ function computeRun() { S.run = ufTimeline(paramP()); if (S.ui.tNow > S.run.tMax
    .lg (item legenda). TIDAK boleh ada stroke-dasharray di jalur daya. */
 function renderSld(p, t, run) {
   var stages = p.stages;
-  var d = scenarioDelta(p.scenario || { kind: 'none' });
-  var offline = {}, impLost = d.impLost, loadExtra = d.loadAdd;
-  if (d.genOff) offline[d.genOff] = true;
-  var f = 50, trips = [];
-  if (run) {
-    f = fAt(run, t);
-    trips = run.tripSeq.filter(function (x) { return x.t <= t + 1e-9; });
-  }
-  var open = {}; trips.forEach(function (x) { open[x.stage] = x; });
-  var shedTotal = trips.reduce(function (a, x) { return a + x.mw; }, 0);
-  var loadNow = p.loadMw + loadExtra - shedTotal;
-  var eff = effGens(p);
-  var gov = ufGovernorAt(eff, f);
-  // kumulatif setpoint AGC per unit sampai playhead (plan-03 P3): diambil dari
-  // langkah AGC terakhir yang sudah terjadi (run.agcSteps[i].cum = snapshot).
-  var agcCum = {};
-  if (run && run.agcSteps && run.agcSteps.length) {
-    for (var ai = run.agcSteps.length - 1; ai >= 0; ai--) {
-      if (run.agcSteps[ai].t <= t + 1e-9) { if (run.agcSteps[ai].cum) agcCum = run.agcSteps[ai].cum; break; }
-    }
-  }
+  var snap = snapshot(p, run, t); // SATU-SATUNYA interpretasi keadaan (lihat §12b) — renderer hanya menggambar
+  var f = snap.f;
+  var loadNow = snap.loadNow, shedTotal = snap.shedTotal;
+  var impLost = snap.impLost;
+  var gens = snap.gen;
+  var open = {};
+  snap.trips.forEach(function (x) { open[x.stage] = x; });
   var out = [];
 
   /* ── bus (y=260, plan-02 §4.3) — M8: generator DI ATAS, beban DI BAWAH ── */
@@ -940,20 +985,19 @@ function renderSld(p, t, run) {
 
   /* ── generator (ATAS bus): lingkaran + salib (×) + chip SAMPING RPM/MW ── */
   var gx = [170, 350, 530];
-  eff.forEach(function (g, i) {
+  gens.forEach(function (g, i) {
     var x = gx[i];
-    var isOff = offline[g.id] === true;
+    var isOff = g.off;
     out.push('<line x1="' + x + '" y1="260" x2="' + x + '" y2="192" stroke="var(--ink)" stroke-width="3"/>');
     out.push('<circle class="gen" cx="' + x + '" cy="170" r="22" fill="var(--surface)" stroke="' + (isOff ? 'var(--off)' : 'var(--ink)') + '" stroke-width="2"/>');
     // salib × (simbol generator standar)
     out.push('<line class="xc" x1="' + (x - 15) + '" y1="155" x2="' + (x + 15) + '" y2="185" stroke="' + (isOff ? 'var(--off)' : 'var(--ink)') + '" stroke-width="2"/>');
     out.push('<line class="xc" x1="' + (x - 15) + '" y1="185" x2="' + (x + 15) + '" y2="155" stroke="' + (isOff ? 'var(--off)' : 'var(--ink)') + '" stroke-width="2"/>');
     out.push('<text x="' + x + '" y="140" text-anchor="middle" font-size="12" font-family="Space Grotesk,sans-serif" font-weight="600" fill="var(--ink)">' + g.id + '</text>');
-    // chip samping kanan: status + RPM + MW (droop + setpoint AGC; cap di govMax)
+    // chip samping kanan: status + RPM + MW (state dari snapshot: off/sat/mwFinal/agcMw)
     var rpm = isOff ? 0 : Math.round(120 * f / g.poles); // n = 120·f/P (P = kutub)
-    var mw = isOff ? 0 : g.p0 + gov.resp[g.id] + (agcCum[g.id] || 0);
-    if (!isOff && g.govMax > g.p0) mw = Math.min(mw, g.govMax);
-    var sat = !isOff && g.govMax > g.p0 && gov.resp[g.id] >= g.govMax - g.p0 - 1e-9 && f < 50;
+    var mw = g.mwFinal;
+    var sat = g.sat;
     var chipBg = isOff ? 'var(--bg)' : (sat ? 'var(--copper-soft)' : 'var(--green-soft)');
     var chipBd = isOff ? 'var(--off)' : (sat ? 'var(--copper)' : 'var(--green)');
     var cx = x + 93; // pusat chip
@@ -962,7 +1006,7 @@ function renderSld(p, t, run) {
     out.push('<text class="chipmw" x="' + cx + '" y="183" text-anchor="middle" font-size="11" font-family="JetBrains Mono,monospace" fill="' + (isOff ? 'var(--off)' : (sat ? 'var(--copper-deep)' : 'var(--green)')) + '">'
       + (isOff ? '0 MW' : (sat ? Math.round(mw) + ' MW · maks gov' : Math.round(mw) + ' MW')) + '</text>');
     // label kecil AGC (plan-03 P3): unit yang menerima setpoint kendali sekunder
-    if (!isOff && (agcCum[g.id] || 0) > 0.5) {
+    if (!isOff && g.agcMw > 0.5) {
       out.push('<rect class="agctag" x="' + (cx - 16) + '" y="134" width="32" height="13" rx="4" fill="var(--copper-soft)" stroke="var(--copper)" stroke-width="1"/>');
       out.push('<text x="' + cx + '" y="143.5" text-anchor="middle" font-size="10" font-weight="600" font-family="JetBrains Mono,monospace" fill="var(--copper-deep)">AGC</text>');
     }
@@ -1189,20 +1233,11 @@ function fAt(run, t) {
    pelepasan berurutan dgn MW nyata + beban sebelum/sesudah. Pill semantik
    .st-seimbang/.st-defisit/.st-pelepasan/.st-pemulihan/.st-runtuh. */
 function renderSide(p, run, t, tab) {
-  var d = scenarioDelta(p.scenario || { kind: 'none' });
-  var impLost = d.impLost, loadExtra = d.loadAdd;
-  var f = 50, trips = [];
-  if (run) {
-    f = fAt(run, t);
-    trips = run.tripSeq.filter(function (x) { return x.t <= t + 1e-9; });
-  }
-  var shedTotal = trips.reduce(function (a, x) { return a + x.mw; }, 0);
-  var loadNow = p.loadMw + loadExtra - shedTotal;
-  var impNow = impLost ? 0 : p.importMw;
-  var gov = ufGovernorAt(effGens(p), f);
-  var deficit = loadNow - gov.sup - impNow;
-  var collapse = collapseAt(run, t);
-  var status = ufStatus(f, { trips: trips.length, collapse: collapse });
+  var snap = snapshot(p, run, t); // SATU-SATUNYA interpretasi keadaan (lihat §12b) — renderer hanya memformat
+  var f = snap.f, trips = snap.trips, gov = snap.gov;
+  var loadNow = snap.loadNow, shedTotal = snap.shedTotal;
+  var deficit = snap.deficit, collapse = snap.collapse, status = snap.status;
+  var agcDisp = snap.agcDisp, phase = snap.phase, rocof0 = snap.rocof0;
   var cls = { SEIMBANG: 'st-seimbang', DEFISIT: 'st-defisit', 'PELEPASAN BEBAN': 'st-pelepasan', PEMULIHAN: 'st-pemulihan', RUNTUH: 'st-runtuh' }[status] || 'st-defisit';
   var h = '<div class="pill ' + cls + '">' + status + '</div>';
 
@@ -1222,30 +1257,16 @@ function renderSide(p, run, t, tab) {
     return h;
   }
 
-  var rocof0 = (run && run.ev && run.ev.length) ? run.ev[0].rocof0 : 0;
   var row = function (k, v) { return '<div class="rline"><span>' + k + '</span><b>' + v + '</b></div>'; };
   h += row('Frekuensi', f.toFixed(2) + ' Hz');
   h += row('ROCOF awal', (rocof0 < 0 ? '' : '+') + rocof0.toFixed(2) + ' Hz/s');
   h += row('Beban sistem', Math.round(loadNow) + ' MW');
   h += row('Pembangkitan', Math.round(gov.sup) + ' MW');
   h += row('Dukungan governor', '+' + Math.round(gov.gov) + ' MW');
-  // AGC sekunder (plan-03 P3 / ADR-0006): total setpoint kumulatif sampai playhead
-  var agcStepsDone = [], agcDisp = 0;
-  if (run && run.agcSteps) {
-    agcStepsDone = run.agcSteps.filter(function (s) { return s.t <= t + 1e-9; });
-    agcDisp = agcStepsDone.reduce(function (a, s) { return a + s.mw; }, 0);
-  }
   h += row('Dukungan AGC', (agcDisp > 0 ? '+' : '') + Math.round(agcDisp) + ' MW');
   h += row('Headroom tersisa', Math.round(gov.head) + ' MW');
   h += row('Defisit', (deficit <= 0 ? '' : '+') + deficit.toFixed(1) + ' MW');
-  // indikator fase kendali: GOVERNOR → AGC → UFLS, yang aktif ditebalkan
-  var lastAgc = agcStepsDone.length ? agcStepsDone[agcStepsDone.length - 1].t : -1;
-  var lastTrip = trips.length ? trips[trips.length - 1].t : -1;
-  var phase = 'idle';
-  if (collapse || (status === 'PELEPASAN BEBAN' && lastTrip >= lastAgc)) phase = 'ufls';
-  else if (lastAgc >= 0 && lastAgc >= lastTrip) phase = 'agc';
-  else if (lastTrip >= 0 && lastTrip > lastAgc) phase = 'ufls';
-  else if (!trips.length && Math.abs(f - 50) > 1e-9) phase = 'governor';
+  // indikator fase kendali: GOVERNOR → AGC → UFLS, yang aktif ditebalkan (dari snapshot)
   var phCls = function (k) { return k === phase ? ' ph-on' : ''; };
   h += '<div class="phase"><span class="phlbl">fase</span>'
     + '<span class="ph' + phCls('governor') + '">GOVERNOR</span><i>→</i>'
@@ -1334,9 +1355,8 @@ function renderSldInto() {
   el.innerHTML = renderSld(p, t, S.run);
   var tag = document.getElementById('sldTag');
   if (tag && S.run) {
-    var f = fAt(S.run, t);
-    var trips = S.run.tripSeq.filter(function (x) { return x.t <= t + 1e-9; }).length;
-    tag.textContent = ufStatus(f, { trips: trips, collapse: collapseAt(S.run, t) }) + ' · ' + f.toFixed(2) + ' Hz';
+    var snap = snapshot(p, S.run, t);
+    tag.textContent = snap.status + ' · ' + snap.f.toFixed(2) + ' Hz';
   }
 }
 function render() {
@@ -1677,6 +1697,7 @@ var API = {
   syncCollapsedCentering: syncCollapsedCentering,
   collapsedStackH: collapsedStackH,
   setSideTab: setSideTab,
+  snapshot: snapshot,
   setView: setView,
   syncViewDom: syncViewDom,
   qTipHover: qTipHover,

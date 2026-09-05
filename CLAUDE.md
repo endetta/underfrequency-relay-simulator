@@ -59,6 +59,16 @@ langsung di browser atau `python -m http.server`.
   `svgBox()` guard default saat tersembunyi/stub; re-render saat resize (`rg`
   observe `#viewGraf`) & saat switch ke Grafik. Tes M10: charts 19 · ui 34 (total
   131). Log: `design-plans/sesi-2026-09-05-06-…`.
+- **Refactor arsitektur (2026-09-05, hasil review arsitektur)**: modul dalam
+  **`snapshot(p, run, t)`** (§12b) = SATU-SATUNYA interpretasi keadaan sesaat untuk
+  presentasi: f, status, fase kendali (governor→AGC→UFLS), trips/shedTotal, loadNow,
+  impNow/impLost, deficit, agcDisp, rocof0, gov, `gen[]` (state online/maks gov
+  via `satDevOf`/TRIP + `mwFinal` + `agcMw`). `renderSld`, `renderSide`, tag
+  `#sldTag` kini hanya memformat — **jangan menghitung ulang turunan ini di
+  renderer** (duplikasi = pola bug M7; renderer lama menulis ulang kondisi saturasi
+  ad hoc). Nol perubahan perilaku (suite lama tetap literal); suite baru
+  `tools/snapshot.test.js` (8 asersi numerik). Total 139 asersi. Log:
+  `design-plans/sesi-2026-09-05-07-…`.
 
 ## Aturan umum workspace — SELF-CONTAINED (tidak perlu membaca CLAUDE.md/AGENTS.md di luar folder ini)
 
@@ -103,7 +113,7 @@ jangan diedit tanpa izin. Bila ragu proyek mana yang dimaksud user: tanyakan.
   (template `design-plans/sesi-TEMPLATE.md`): waktu mulai + commit sebelum → kegiatan
   & hasil (ringkas, dgn bukti tes/angka) → status → langkah berikutnya. Perbarui juga
   status header `design-plans/plan-*.md` yang dipakai (DRAF → DIEKSEKUSI → SELESAI).
-- Riwayat terbaru: `sesi-2026-09-05-06` (M10: grafik mengisi kolom — renderer adaptif dims) → `sesi-2026-09-05-05` (M9: audit overlap SLD — kotak feeder tak lagi tumpuk) → `sesi-2026-09-05-04` (M8: bug play + rombak SLD) → `sesi-2026-09-05-03` (M7: temuan code-review) → `sesi-2026-09-05-02` (plan-03 M6: AGC + player real-time + jendela 30 s).
+- Riwayat terbaru: `sesi-2026-09-05-07` (refactor snapshot keadaan sesaat) → `sesi-2026-09-05-06` (M10: grafik mengisi kolom — renderer adaptif dims) → `sesi-2026-09-05-05` (M9: audit overlap SLD — kotak feeder tak lagi tumpuk) → `sesi-2026-09-05-04` (M8: bug play + rombak SLD) → `sesi-2026-09-05-03` (M7: temuan code-review) → `sesi-2026-09-05-02` (plan-03 M6: AGC + player real-time + jendela 30 s).
   Sebelumnya: `sesi-2026-09-05-01` (audit improve-ui → eksekusi M5, plan-02 SELESAI).
 - **Sesi/AI baru mulai dari:** file ini → log sesi terbaru → plan ber-status DRAF/BELUM
   → kerjakan lanjutannya. Riwayat & arah tersimpan di file — jangan eksplorasi ulang.
@@ -166,6 +176,7 @@ node tools/timeline.test.js  # determinisme, urutan trip, parity, RUNTUH
 node tools/sld.test.js       # geometri SLD (salib, solid, vital teal, pemutus)
 node tools/charts.test.js    # skala grafik/gauge/tegangan (literal)
 node tools/ui.test.js        # seam desain + transport kompak + kartu kanan
+node tools/snapshot.test.js  # snapshot keadaan sesaat (numerik, lintas-permukaan)
 node tools/shoot.js          # screenshot semua view → tools/shots/ + report.txt
 ```
 

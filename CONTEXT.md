@@ -89,7 +89,17 @@ Keadaan sistem pada satu saat: **SEIMBANG** (f dalam pita normal 50 ±0,2 Hz),
 **DEFISIT** (f turun, governor bekerja menahan), **PELEPASAN BEBAN** (satu atau
 lebih tahap UFLS telah bekerja), **PEMULIHAN** (f naik kembali menuju pita normal),
 atau **RUNTUH** (tak tertahankan). Ditampilkan dengan warna semantik di kartu kanan.
-_Avoid_: blackout, status sistem**Diagram satu garis (SLD)** :
+_Avoid_: blackout, status sistem
+
+**Keadaan sesaat (snapshot)** :
+Turunan presentasi terinterpretasi dari satu (param, run, t): frekuensi, status
+kondisi, fase kendali (governor→AGC→UFLS), trip ≤ t & MW lepas, beban/pembangkitan,
+defisit, headroom, state tiap unit (online / maks gov / TRIP), setpoint AGC
+kumulatif. Satu-satunya sumber interpretasi untuk SLD, tag status, dan kartu kanan
+(modul `snapshot(p, run, t)`); renderer TIDAK menghitung ulang turunan ini.
+_Avoid_: derived state, presentation state
+
+**Diagram satu garis (SLD)** :
 Kanvas utama simulator: unit pembangkit → bus → feeder beban dengan pemutus;
 menampilkan status & aliran daya secara langsung.
 _Avoid_: SLT, single line diagram, diagram skematik
