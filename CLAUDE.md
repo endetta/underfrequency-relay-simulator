@@ -31,8 +31,52 @@ langsung di browser atau `python -m http.server`.
   + auto-play saat klik skenario + skenario `imp` paksa preset berimpor; jendela
   grafik **0–30 s** (`x=38+t/30·628`); chip SLD label AGC + baris `Dukungan AGC` +
   indikator fase di kartu kanan. Plan: `design-plans/plan-03-…`.
+- **M7 (2026-09-05, temuan code-review)**: skenario lengkap PRD §4.2/§5.10 — **Lepas
+  G2**, **Blok G3 (maks 100 MW)**, **beban tambahan [MW]** (slider `#loadStepSlider`,
+  dipakai chip '+ Beban'); perbaikan **GENERATOR_BLOCK** (output unit dijepit ke
+  govMax → defisit nyata, PRD §5.3); interpretasi skenario disatukan ke satu sumber
+  (`scenarioDelta`/`applyScenario`/`effGens` — 4 situs duplikat dihapus) + `collapseAt`
+  (2 loop duplikat); warna renderer lewat **`var(--*)`** (var baru `--grid`/`--off`);
+  dokumen basi disinkronkan (PRD §4.4, overview, implementation-plan §5).
 
-## Log sesi & sinkronisasi dokumen (WAJIB — aturan root poin 8)
+## Aturan umum workspace — SELF-CONTAINED (tidak perlu membaca CLAUDE.md/AGENTS.md di luar folder ini)
+
+Folder ini = **repo git sendiri** (`endetta/underfrequency-relay-simulator`, branch
+`main`, identitas git **repo-lokal**: `user.name=endetta`,
+`user.email=endetta@users.noreply.github.com` — ulangi dua baris `git config` itu bila
+`.git/config` hilang). Bekerja HANYA di dalam folder ini; root library bukan repo git.
+Berikut saripati aturan root `CLAUDE.md` (aslinya tetap ada untuk proyek lain):
+
+1. **Satu perubahan = satu proyek.** Jangan mencampur edit lintas proyek dalam satu
+   commit; jangan `git add` dari root. Commit + push `origin/main` dari folder ini di
+   sesi yang sama (warning LF→CRLF saat `git add` di Windows benign — abaikan).
+2. **Bahasa.** UI, dokumentasi, pesan commit = Bahasa Indonesia; istilah teknis
+   proteksi tidak diterjemahkan. Komentar kode boleh Indonesia.
+3. **Tidak ada build.** Jalankan `underfrequency_relay_simulator.html` langsung di
+   browser / `python -m http.server` / `npx serve`. Validasi = Node (harness
+   stub-DOM `tools/lens-harness.js` + `tools/*.test.js`) + `node tools/shoot.js`
+   (butuh Chrome + Node ≥ 22).
+4. **Jangan mengubah nama/path yang di-hard-code.** Tes & `shoot.js` meng-hard-code
+   nama file HTML dan id DOM (daftar lengkap di bagian *Gotcha*) — update semua
+   referensi bila rename.
+5. **Windows + Git Bash.** Perintah POSIX (`ls`, `mv`, `rm`, `git`); jangan
+   `del`/`move`/`dir`.
+6. **Verifikasi sebelum selesai.** Perubahan non-sepele: semua suite hijau (lihat
+   *Tes & validasi* di bawah) + `shoot.js` bersih (bodyScroll=0 desktop, sldScale
+   ≥ 1,0, font efektif ≥ 9,5, consoleErrors=0, overflow none, playcheck PASS).
+7. **Log sesi wajib** — lihat bagian berikut.
+
+**Peta library (tetangga — jangan diedit lintas proyek):** root berisi
+`LEVEL 1 - *.html` (kalkulator mandiri), `LEVEL 2 - DIFFERENTIAL RELAY SIMULATOR` &
+`LEVEL 2 - DISTANCE RELAY SIMULATOR` (saudara satu-file vanilla; seam desain di sini
+diwarisi dari mereka), dan `LEVEL 3 - PROTECTION SYSTEM SIMULATOR` (platform React —
+modul Differential R10 **FROZEN**, jangan sentuh; modul underfrequency U01 = referensi
+persamaan saja, ADR-0001). Nama folder resmi ber-spasi/caps — **jangan di-rename**.
+Dua implementasi differential (LEVEL 2 vs LEVEL 3) sengaja berbeda — jangan
+disinkronkan membabi buta. `LEVEL 1 - SYNCHRONOUS GENERATOR SIMULATOR (UNSTABLE).html`
+jangan diedit tanpa izin. Bila ragu proyek mana yang dimaksud user: tanyakan.
+
+## Log sesi & sinkronisasi dokumen (WAJIB — aturan umum poin 7)
 
 - Tiap perubahan non-sepele dicatat di `design-plans/sesi-YYYY-MM-DD-NN-*.md`
   (template `design-plans/sesi-TEMPLATE.md`): waktu mulai + commit sebelum → kegiatan
@@ -105,7 +149,7 @@ node tools/shoot.js          # screenshot semua view → tools/shots/ + report.t
 ```
 
 Gerbang perubahan non-sepele: semua suite hijau + `shoot.js` bersih (tanpa overflow
-> 2 px, tanpa exception, font OK) + smoke browser manual (preset & 6 skenario,
+> 2 px, tanpa exception, font OK) + smoke browser manual (preset & 8 skenario,
 play/speed/scrub/reset, tab kanan, collapse). Tidak ada build.
 
 ## Gotcha (jangan diregresi)
@@ -134,4 +178,3 @@ play/speed/scrub/reset, tab kanan, collapse). Tidak ada build.
   badge AGC); default produk `agcOn:true, agcRate:40, agcInterval:2`; `setAgc(on)`
   recompute run penuh; `agcOn=false` harus tetap menghasilkan perilaku pra-ADR-0006
   (literal 49,686 diuji). Jangan ubah tanpa amendemen PRD §5.4b/ADR-0006.
-- Windows + Git Bash: perintah POSIX (`ls`, `mv`, `rm`); warning LF→CRLF benign.
