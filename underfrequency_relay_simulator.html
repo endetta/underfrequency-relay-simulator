@@ -998,10 +998,10 @@ function renderSld(p, t, run) {
   var impTxt = impLost ? '0 MW · LEPAS' : impMw + ' MW';
   var impCol = impLost ? 'var(--red)' : 'var(--blue)';
   var impBg  = impLost ? 'var(--red-soft)' : 'var(--blue-soft)';
-  out.push('<rect class="imp" x="60" y="24" width="110" height="34" rx="7" fill="' + impBg + '" stroke="' + impCol + '"/>');
-  out.push('<text x="115" y="38" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" letter-spacing=".06em" fill="var(--ink-soft)">INTERKONEKSI</text>');
-  out.push('<text x="115" y="52" text-anchor="middle" font-size="12" font-weight="600" font-family="JetBrains Mono,monospace" fill="' + impCol + '">' + impTxt + '</text>');
-  out.push('<line class="imp" x1="115" y1="58" x2="115" y2="252" stroke="var(--ink)" stroke-width="3"/>');
+  out.push('<rect class="imp" x="60" y="48" width="110" height="34" rx="7" fill="' + impBg + '" stroke="' + impCol + '"/>'); // F3: blok impor turun → void impor→gen 90→38 px
+  out.push('<text x="115" y="62" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" letter-spacing=".06em" fill="var(--ink-soft)">INTERKONEKSI</text>');
+  out.push('<text x="115" y="76" text-anchor="middle" font-size="12" font-weight="600" font-family="JetBrains Mono,monospace" fill="' + impCol + '">' + impTxt + '</text>');
+  out.push('<line class="imp" x1="115" y1="82" x2="115" y2="252" stroke="var(--ink)" stroke-width="3"/>');
   out.push('<rect class="brk" data-open="' + (impLost ? 1 : 0) + '" x="109" y="254" width="12" height="12" fill="' + (impLost ? 'var(--red-soft)' : 'var(--surface)') + '" stroke="' + (impLost ? 'var(--red)' : 'var(--ink)') + '" stroke-width="1.5"'
     + (impLost ? ' transform="rotate(45 115 260)"' : '') + '/>');
   if (impLost) out.push('<text class="openlab" x="115" y="246" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" fill="var(--red)" paint-order="stroke" stroke="var(--surface)" stroke-width="3">TERBUKA</text>');
@@ -1011,12 +1011,12 @@ function renderSld(p, t, run) {
   gens.forEach(function (g, i) {
     var x = gx[i];
     var isOff = g.off;
-    out.push('<line x1="' + x + '" y1="260" x2="' + x + '" y2="192" stroke="var(--ink)" stroke-width="3"/>');
-    out.push('<circle class="gen" cx="' + x + '" cy="170" r="22" fill="var(--surface)" stroke="' + (isOff ? 'var(--off)' : 'var(--ink)') + '" stroke-width="2"/>');
+    out.push('<line x1="' + x + '" y1="260" x2="' + x + '" y2="164" stroke="var(--ink)" stroke-width="3"/>'); // F3: band gen naik — garis menyentuh tepi lingkaran (cy142+r22)
+    out.push('<circle class="gen" cx="' + x + '" cy="142" r="22" fill="var(--surface)" stroke="' + (isOff ? 'var(--off)' : 'var(--ink)') + '" stroke-width="2"/>');
     // salib × (simbol generator standar)
-    out.push('<line class="xc" x1="' + (x - 15) + '" y1="155" x2="' + (x + 15) + '" y2="185" stroke="' + (isOff ? 'var(--off)' : 'var(--ink)') + '" stroke-width="2"/>');
-    out.push('<line class="xc" x1="' + (x - 15) + '" y1="185" x2="' + (x + 15) + '" y2="155" stroke="' + (isOff ? 'var(--off)' : 'var(--ink)') + '" stroke-width="2"/>');
-    out.push('<text x="' + x + '" y="140" text-anchor="middle" font-size="12" font-family="Space Grotesk,sans-serif" font-weight="600" fill="var(--ink)">' + g.id + '</text>');
+    out.push('<line class="xc" x1="' + (x - 15) + '" y1="127" x2="' + (x + 15) + '" y2="157" stroke="' + (isOff ? 'var(--off)' : 'var(--ink)') + '" stroke-width="2"/>');
+    out.push('<line class="xc" x1="' + (x - 15) + '" y1="157" x2="' + (x + 15) + '" y2="127" stroke="' + (isOff ? 'var(--off)' : 'var(--ink)') + '" stroke-width="2"/>');
+    out.push('<text x="' + x + '" y="112" text-anchor="middle" font-size="12" font-family="Space Grotesk,sans-serif" font-weight="600" fill="var(--ink)">' + g.id + '</text>');
     // chip samping kanan: status + RPM + MW (state dari snapshot: off/sat/mwFinal/agcMw)
     var rpm = isOff ? 0 : Math.round(120 * f / g.poles); // n = 120·f/P (P = kutub)
     var mw = g.mwFinal;
@@ -1024,14 +1024,14 @@ function renderSld(p, t, run) {
     var chipBg = isOff ? 'var(--bg)' : (sat ? 'var(--copper-soft)' : 'var(--green-soft)');
     var chipBd = isOff ? 'var(--off)' : (sat ? 'var(--copper)' : 'var(--green)');
     var cx = x + 86; // pusat chip lebar 104 (x+34..x+138) — F2
-    out.push('<rect class="chip" cx-chip="' + x + '" x="' + (x + 34) + '" y="148" width="104" height="44" rx="7" fill="' + chipBg + '" stroke="' + chipBd + '"/>');
-    out.push('<text x="' + cx + '" y="167" text-anchor="middle" font-size="12" font-weight="600" font-family="JetBrains Mono,monospace" fill="var(--ink)">' + (isOff ? 'TRIP' : 'RPM ' + rpm) + '</text>');
-    out.push('<text class="chipmw" x="' + cx + '" y="183" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" fill="' + (isOff ? 'var(--off)' : (sat ? 'var(--copper-deep)' : 'var(--green)')) + '">'
+    out.push('<rect class="chip" cx-chip="' + x + '" x="' + (x + 34) + '" y="100" width="104" height="44" rx="7" fill="' + chipBg + '" stroke="' + chipBd + '"/>'); // F3: chip ikut naik (band gen)
+    out.push('<text x="' + cx + '" y="119" text-anchor="middle" font-size="12" font-weight="600" font-family="JetBrains Mono,monospace" fill="var(--ink)">' + (isOff ? 'TRIP' : 'RPM ' + rpm) + '</text>');
+    out.push('<text class="chipmw" x="' + cx + '" y="135" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" fill="' + (isOff ? 'var(--off)' : (sat ? 'var(--copper-deep)' : 'var(--green)')) + '">'
       + (isOff ? '0 MW' : (sat ? Math.round(mw) + ' MW · maks gov' : Math.round(mw) + ' MW')) + '</text>'); // F2: font 10 agar '· maks gov' muat di 104 px
     // label kecil AGC (plan-03 P3): unit yang menerima setpoint kendali sekunder
     if (!isOff && g.agcMw > 0.5) {
-      out.push('<rect class="agctag" x="' + (cx - 16) + '" y="134" width="32" height="13" rx="4" fill="var(--copper-soft)" stroke="var(--copper)" stroke-width="1"/>');
-      out.push('<text x="' + cx + '" y="143.5" text-anchor="middle" font-size="10" font-weight="600" font-family="JetBrains Mono,monospace" fill="var(--copper-deep)">AGC</text>');
+      out.push('<rect class="agctag" x="' + (cx - 16) + '" y="86" width="32" height="13" rx="4" fill="var(--copper-soft)" stroke="var(--copper)" stroke-width="1"/>'); // F3: ikut naik (atas chip y=100, celah 1 px)
+      out.push('<text x="' + cx + '" y="95.5" text-anchor="middle" font-size="10" font-weight="600" font-family="JetBrains Mono,monospace" fill="var(--copper-deep)">AGC</text>');
     }
   });
 

@@ -138,10 +138,10 @@ check('Blok G3 (maks 100): chip G3 = 100 MW (output dijepit PRD §5.3), bukan 25
 
 /* ── M8: rombak SLD per permintaan user — generator DI ATAS bus, beban DI BAWAH,
    label feeder dua baris (tanpa overlap), pemutus lebih besar 12×12. ── */
-check('M8: generator di ATAS bus — lingkaran cy=170 (di atas bus 260), garis naik 260→192', () => {
+check('M8+F3: generator di ATAS bus — lingkaran cy=142 (di atas bus 260), garis naik 260→164 (F3)', () => {
   const s = renderAt(baseP, baseRun, 0);
-  if (count(s, 'cy="170"') !== 3) throw new Error('3 lingkaran generator harus di atas bus (cy=170), dapat ' + count(s, 'cy="170"'));
-  if (count(s, 'y2="192"') !== 3) throw new Error('garis tiap generator harus naik dari bus (260) ke lingkaran (y2=192)');
+  if (count(s, 'cy="142"') !== 3) throw new Error('3 lingkaran generator harus di atas bus (cy=142), dapat ' + count(s, 'cy="142"'));
+  if (count(s, 'y2="164"') !== 3) throw new Error('garis tiap generator harus naik dari bus (260) ke tepi lingkaran (y2=164), dapat ' + count(s, 'y2="164"'));
   if (s.includes('y2="300"')) throw new Error('generator TIDAK boleh lagi di bawah bus');
 });
 check('M8+F1: beban di BAWAH bus — kotak feeder y=400, garis turun 260→400 MENYENTUH kotak (gap 8 px hilang)', () => {
@@ -240,16 +240,16 @@ check('plan-03: MW chip = droop + setpoint AGC, tidak pernah melewati govMax', (
 });
 
 /* ── F2 (plan-05): band generator lega & seimbang — chip 104 @ pitch 180 ── */
-check('F2: chip generator 104 lebar (bukan 118) — 3 chip @ y=148', () => {
+check('F2+F3: chip generator 104 lebar (bukan 118) — 3 chip @ y=100 (F3)', () => {
   const s = renderAt(baseP, baseRun, 0);
-  const chips = [...s.matchAll(/<rect class="chip"[^>]*x="([0-9]+)" y="148" width="104" height="44"/g)].map(m => parseInt(m[1], 10));
-  if (chips.length !== 3) throw new Error('harus 3 chip lebar 104, dapat ' + chips.length + ': ' + chips);
+  const chips = [...s.matchAll(/<rect class="chip"[^>]*x="([0-9]+)" y="100" width="104" height="44"/g)].map(m => parseInt(m[1], 10));
+  if (chips.length !== 3) throw new Error('harus 3 chip lebar 104 @ y=100, dapat ' + chips.length + ': ' + chips);
   if (s.includes('width="118" height="44"')) throw new Error('chip lebar 118 harus dihapus (F2)');
 });
 check('F2: gap chip→lingkaran tetangga >= 20 px & margin kanan >= 30 px', () => {
   const s = renderAt(baseP, baseRun, 0);
   const gx = [170, 350, 530];
-  const chipX = [...s.matchAll(/<rect class="chip"[^>]*x="([0-9]+)" y="148" width="104"/g)].map(m => parseInt(m[1], 10));
+  const chipX = [...s.matchAll(/<rect class="chip"[^>]*x="([0-9]+)" y="100" width="104"/g)].map(m => parseInt(m[1], 10));
   if (chipX.length !== 3) throw new Error('3 chip lebar 104 dibutuhkan, dapat ' + chipX.length);
   for (let i = 0; i < 2; i++) {
     const gap = gx[i + 1] - 22 - (chipX[i] + 104); // lingkaran tetangga kiri = gx−22
@@ -265,6 +265,27 @@ check('F2: baris MW chip font 10 (floor >= 10), tanpa font 11', () => {
   mws.forEach(fs => {
     if (parseFloat(fs) !== 10) throw new Error('font MW chip harus 10, dapat ' + fs + ' (F2)');
   });
+});
+
+/* ── F3 (plan-06): komposisi vertikal — blok impor turun, band gen naik, void ≤ 40 ── */
+check('F3: blok interkoneksi turun (y=48) — label id gen y=112, chip y=100, AGC y=86', () => {
+  const s = renderAt(baseP, baseRun, 0);
+  if (!s.includes('x="60" y="48" width="110" height="34"')) throw new Error('blok interkoneksi harus di y=48 (F3)');
+  if (count(s, 'y="112"') !== 3) throw new Error('3 label id gen harus di y=112 (F3), dapat ' + count(s, 'y="112"'));
+  const t1 = agcRun.agcSteps[0].t;
+  const sAgc = renderAt(agcP, agcRun, t1 + 0.05);
+  if (count(sAgc, 'class="agctag"') !== 3) throw new Error('3 label AGC dibutuhkan');
+  if (!sAgc.includes('y="86"')) throw new Error('AGC tag harus di y=86 (F3)');
+});
+check('F3: void vertikal impor→gen <= 40 px (void 90 px lama hilang)', () => {
+  const s = renderAt(baseP, baseRun, 0);
+  const impRect = s.match(/<rect class="imp" x="([0-9]+)" y="([0-9]+)" width="110" height="34"/);
+  if (!impRect) throw new Error('rect impor harus ada');
+  const impBottom = parseInt(impRect[2], 10) + 34;
+  const cy = parseInt((s.match(/cy="([0-9]+)"/) || [])[1], 10);
+  if (!cy) throw new Error('cy lingkaran harus ada');
+  const voidPx = cy - 22 - impBottom; // atas lingkaran = cy − r
+  if (voidPx > 40) throw new Error('void impor→gen = ' + voidPx + ' px > 40 (F3)');
 });
 
 console.log(`\n${passed} lulus, ${failed} gagal`);
