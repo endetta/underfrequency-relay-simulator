@@ -1023,11 +1023,11 @@ function renderSld(p, t, run) {
     var sat = g.sat;
     var chipBg = isOff ? 'var(--bg)' : (sat ? 'var(--copper-soft)' : 'var(--green-soft)');
     var chipBd = isOff ? 'var(--off)' : (sat ? 'var(--copper)' : 'var(--green)');
-    var cx = x + 93; // pusat chip
-    out.push('<rect class="chip" cx-chip="' + x + '" x="' + (x + 34) + '" y="148" width="118" height="44" rx="7" fill="' + chipBg + '" stroke="' + chipBd + '"/>');
+    var cx = x + 86; // pusat chip lebar 104 (x+34..x+138) — F2
+    out.push('<rect class="chip" cx-chip="' + x + '" x="' + (x + 34) + '" y="148" width="104" height="44" rx="7" fill="' + chipBg + '" stroke="' + chipBd + '"/>');
     out.push('<text x="' + cx + '" y="167" text-anchor="middle" font-size="12" font-weight="600" font-family="JetBrains Mono,monospace" fill="var(--ink)">' + (isOff ? 'TRIP' : 'RPM ' + rpm) + '</text>');
-    out.push('<text class="chipmw" x="' + cx + '" y="183" text-anchor="middle" font-size="11" font-family="JetBrains Mono,monospace" fill="' + (isOff ? 'var(--off)' : (sat ? 'var(--copper-deep)' : 'var(--green)')) + '">'
-      + (isOff ? '0 MW' : (sat ? Math.round(mw) + ' MW · maks gov' : Math.round(mw) + ' MW')) + '</text>');
+    out.push('<text class="chipmw" x="' + cx + '" y="183" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" fill="' + (isOff ? 'var(--off)' : (sat ? 'var(--copper-deep)' : 'var(--green)')) + '">'
+      + (isOff ? '0 MW' : (sat ? Math.round(mw) + ' MW · maks gov' : Math.round(mw) + ' MW')) + '</text>'); // F2: font 10 agar '· maks gov' muat di 104 px
     // label kecil AGC (plan-03 P3): unit yang menerima setpoint kendali sekunder
     if (!isOff && g.agcMw > 0.5) {
       out.push('<rect class="agctag" x="' + (cx - 16) + '" y="134" width="32" height="13" rx="4" fill="var(--copper-soft)" stroke="var(--copper)" stroke-width="1"/>');

@@ -58,7 +58,7 @@ node tools/plot.test.js      # ruang plot plotSpace (margin, kotak, sizeSvg)
 node tools/shoot.js          # screenshot semua view → tools/shots/
 ```
 
-156 asersi, hijau di Node ≥ 22 (tanpa dependensi) — model 33 · timeline 21 · sld 24 ·
+159 asersi, hijau di Node ≥ 22 (tanpa dependensi) — model 33 · timeline 21 · sld 27 ·
 charts 19 · ui 34 · snapshot 8 · sim 6 · plot 11. Detail: `docs/overview.md`,
 `docs/PRD.md` (model), `docs/implementation-plan.md` (kontrak).
 

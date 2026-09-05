@@ -59,14 +59,10 @@ langsung di browser atau `python -m http.server`.
   `svgBox()` guard default saat tersembunyi/stub; re-render saat resize (`rg`
   observe `#viewGraf`) & saat switch ke Grafik. Tes M10: charts 19 · ui 34 (total
   131). Log: `design-plans/sesi-2026-09-05-06-…`.
-- **M11 (2026-09-05, audit improve-ui → SLD UX F1)**: hasil audit terukur (probe CDP:
-  gap 8,0 px garis feeder↔kotak; gap 6,0 px chip↔lingkaran; margin kanan 18 px;
-  void vertikal 90 px — zero-overlap bertahan) → 3 plan eksekusi di `design-plans/`
-  (plan-04/05/06, status DRAF→SELESAI). **F1 (plan-04)**: garis feeder kini
-  **menyentuh tepi atas kotak** (`y2="400"`, sebelumnya 392 → garis menggantung
-  8 px); 2 asersi M8 di sld.test diperbarui via TDD (merah→hijau); probe gap=0
-  di semua 5 feeder. Log: `design-plans/sesi-2026-09-05-10-…`.
-  Lanjutan: F2 (plan-05) & F3 (plan-06) menunggu eksekusi.
+- **M11 F1 (2026-09-05, eksekusi plan-04)**: garis feeder kini **menyentuh tepi
+  atas kotak** (`y2="400"`, sebelumnya 392 → garis menggantung 8 px); 2 asersi
+  M8 di sld.test diperbarui via TDD (merah→hijau); probe CDP gap=0 di semua
+  5 feeder. Log: `design-plans/sesi-2026-09-05-10-…`.
 - **Refactor arsitektur (2026-09-05, hasil review arsitektur)**: modul dalam
   **`snapshot(p, run, t)`** (§12b) = SATU-SATUNYA interpretasi keadaan sesaat untuk
   presentasi: f, status, fase kendali (governor→AGC→UFLS), trips/shedTotal, loadNow,
@@ -96,6 +92,12 @@ langsung di browser atau `python -m http.server`.
   margin/kotak di tempat lain** — baca dari plotSpace. Suite baru
   `tools/plot.test.js` (11 asersi). Total 156 asersi. Log:
   `design-plans/sesi-2026-09-05-09-…`.
+- **M11 F2 (2026-09-05, eksekusi plan-05)**: band generator lega & seimbang —
+  chip **118 → 104 px** @ pitch 180 → **gap chip→lingkaran tetangga 6 → 20 px**,
+  **margin kanan 18 → 32 px** (vs kiri 60); `cx` pusat chip 93→86; font baris MW
+  **11 → 10** (tetap ≥ floor 10) agar `· maks gov` (bbox 102 px) muat di 104.
+  Tes F2 baru di sld.test (27 asersi). Total 159 asersi. Log:
+  `design-plans/sesi-2026-09-05-11-…`. Lanjutan: F3 (plan-06) masih DRAF.
 
 ## Aturan umum workspace — SELF-CONTAINED (tidak perlu membaca CLAUDE.md/AGENTS.md di luar folder ini)
 
@@ -140,7 +142,7 @@ jangan diedit tanpa izin. Bila ragu proyek mana yang dimaksud user: tanyakan.
   (template `design-plans/sesi-TEMPLATE.md`): waktu mulai + commit sebelum → kegiatan
   & hasil (ringkas, dgn bukti tes/angka) → status → langkah berikutnya. Perbarui juga
   status header `design-plans/plan-*.md` yang dipakai (DRAF → DIEKSEKUSI → SELESAI).
-- Riwayat terbaru: `sesi-2026-09-05-10` (M11 F1: garis feeder tersambung) → `sesi-2026-09-05-09` (K3: plotSpace) → `sesi-2026-09-05-08` (K2: fasilitas run sim) → `sesi-2026-09-05-07` (refactor snapshot keadaan sesaat) → `sesi-2026-09-05-06` (M10: grafik mengisi kolom — renderer adaptif dims) → `sesi-2026-09-05-05` (M9: audit overlap SLD — kotak feeder tak lagi tumpuk) → `sesi-2026-09-05-04` (M8: bug play + rombak SLD) → `sesi-2026-09-05-03` (M7: temuan code-review) → `sesi-2026-09-05-02` (plan-03 M6: AGC + player real-time + jendela 30 s).
+- Riwayat terbaru: `sesi-2026-09-05-11` (M11 F2: spasi band generator) → `sesi-2026-09-05-10` (M11 F1: garis feeder tersambung) → `sesi-2026-09-05-09` (K3: plotSpace) → `sesi-2026-09-05-08` (K2: fasilitas run sim) → `sesi-2026-09-05-07` (refactor snapshot keadaan sesaat) → `sesi-2026-09-05-06` (M10: grafik mengisi kolom — renderer adaptif dims) → `sesi-2026-09-05-05` (M9: audit overlap SLD — kotak feeder tak lagi tumpuk) → `sesi-2026-09-05-04` (M8: bug play + rombak SLD) → `sesi-2026-09-05-03` (M7: temuan code-review) → `sesi-2026-09-05-02` (plan-03 M6: AGC + player real-time + jendela 30 s).
   Sebelumnya: `sesi-2026-09-05-01` (audit improve-ui → eksekusi M5, plan-02 SELESAI).
 - **Sesi/AI baru mulai dari:** file ini → log sesi terbaru → plan ber-status DRAF/BELUM
   → kerjakan lanjutannya. Riwayat & arah tersimpan di file — jangan eksplorasi ulang.

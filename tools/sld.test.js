@@ -239,5 +239,33 @@ check('plan-03: MW chip = droop + setpoint AGC, tidak pernah melewati govMax', (
   if (vals[1] > g2.govMax) throw new Error('MW G2 tidak boleh melewati govMax ' + g2.govMax + ', dapat ' + vals[1]);
 });
 
+/* ── F2 (plan-05): band generator lega & seimbang — chip 104 @ pitch 180 ── */
+check('F2: chip generator 104 lebar (bukan 118) — 3 chip @ y=148', () => {
+  const s = renderAt(baseP, baseRun, 0);
+  const chips = [...s.matchAll(/<rect class="chip"[^>]*x="([0-9]+)" y="148" width="104" height="44"/g)].map(m => parseInt(m[1], 10));
+  if (chips.length !== 3) throw new Error('harus 3 chip lebar 104, dapat ' + chips.length + ': ' + chips);
+  if (s.includes('width="118" height="44"')) throw new Error('chip lebar 118 harus dihapus (F2)');
+});
+check('F2: gap chip→lingkaran tetangga >= 20 px & margin kanan >= 30 px', () => {
+  const s = renderAt(baseP, baseRun, 0);
+  const gx = [170, 350, 530];
+  const chipX = [...s.matchAll(/<rect class="chip"[^>]*x="([0-9]+)" y="148" width="104"/g)].map(m => parseInt(m[1], 10));
+  if (chipX.length !== 3) throw new Error('3 chip lebar 104 dibutuhkan, dapat ' + chipX.length);
+  for (let i = 0; i < 2; i++) {
+    const gap = gx[i + 1] - 22 - (chipX[i] + 104); // lingkaran tetangga kiri = gx−22
+    if (gap < 20) throw new Error('gap chip' + (i + 1) + '→gen' + (i + 2) + ' = ' + gap + ' px < 20');
+  }
+  const marginR = 700 - (chipX[2] + 104);
+  if (marginR < 30) throw new Error('margin kanan = ' + marginR + ' px < 30');
+});
+check('F2: baris MW chip font 10 (floor >= 10), tanpa font 11', () => {
+  const s = renderAt(baseP, baseRun, 0);
+  const mws = [...s.matchAll(/<text class="chipmw"[^>]*font-size="([0-9.]+)"/g)].map(m => m[1]);
+  if (mws.length !== 3) throw new Error('3 baris MW chip dibutuhkan, dapat ' + mws.length);
+  mws.forEach(fs => {
+    if (parseFloat(fs) !== 10) throw new Error('font MW chip harus 10, dapat ' + fs + ' (F2)');
+  });
+});
+
 console.log(`\n${passed} lulus, ${failed} gagal`);
 process.exit(failed ? 1 : 0);
