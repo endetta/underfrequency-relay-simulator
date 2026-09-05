@@ -1,8 +1,9 @@
-/* Tes GRAFIK (PRD §5 / rencana §5 M2) — geometri & literal posisi:
-   renderFreq (jendela 0–12 s, y 47–52 Hz, pita normal ±0.2, ambang T1–T4
+/* Tes GRAFIK (PRD §5 / rencana §5 M2 + plan-03 P1) — geometri & literal posisi:
+   renderFreq (jendela 0–30 s, y 47–52 Hz, pita normal ±0.2, ambang T1–T4
    putus-putus copper, penanda peristiwa & trip), renderGauge (batang gradien
    hijau→merah + penunjuk f), renderVolt (pu 0.85–1.05 + lantai 0.85 + label
-   ilustratif). Nilai literal hitung tangan dari skala y = 12 + (52−f)/5·214.
+   ilustratif). Nilai literal hitung tangan dari skala y = 12 + (52−f)/5·214 dan
+   x = 38 + t/30·628 (jendela 0–30 s, plan-03 P1).
    Jalankan: node tools/charts.test.js */
 'use strict';
 const path = require('path');
@@ -40,10 +41,10 @@ check('skala: y(52)=12, y(50)=97.6, y(49.5)=119, y(47)=226 (jendela 47–52 Hz)'
   approx(A.fToY(49.5), 119, 1e-6, 'y49.5'); // 12 + 2.5/5·214
   approx(A.fToY(47), 226, 1e-6, 'y47');
 });
-check('skala: x(0)=38, x(6)=352, x(12)=666 (jendela 0–12 s)', () => {
+check('skala: x(0)=38, x(15)=352, x(30)=666 (jendela 0–30 s)', () => {
   approx(A.tToX(0), 38, 1e-6, 'x0');
-  approx(A.tToX(6), 352, 1e-6, 'x6');   // 38 + 6/12·628
-  approx(A.tToX(12), 666, 1e-6, 'x12');
+  approx(A.tToX(15), 352, 1e-6, 'x15');  // 38 + 15/30·628
+  approx(A.tToX(30), 666, 1e-6, 'x30');
 });
 
 /* ── renderFreq: struktur & penanda ── */
@@ -66,9 +67,9 @@ check('renderFreq: 4 garis ambang putus-putus copper di y literal + label T1–T
   if (!s.includes('y1="183.2"') || !s.includes('y2="183.2"')) throw new Error('T4 (48.0) harus y=183.2'); // 12+4/5·214
   ['T1', 'T2', 'T3', 'T4'].forEach(id => { if (!s.includes('>' + id + '<')) throw new Error('label ' + id + ' hilang'); });
 });
-check('renderFreq: penanda peristiwa di t=1.0 (x=90.3) & trip T1 di t trip (x literal)', () => {
+check('renderFreq: penanda peristiwa di t=1.0 (x=58.9) & trip T1 di t trip (x literal)', () => {
   const s = A.renderFreq(impP, impRun, 2.2);
-  if (!s.includes('x1="90.3"') || !s.includes('x2="90.3"')) throw new Error('peristiwa t=1.0 → x=38+1/12·628=90.3');
+  if (!s.includes('x1="58.9"') || !s.includes('x2="58.9"')) throw new Error('peristiwa t=1.0 → x=38+1/30·628=58.9');
   if (!s.includes('class="ev"')) throw new Error('penanda peristiwa butuh kelas ev');
   const trip1 = impRun.tripSeq[0];
   if (!trip1) throw new Error('harus ada trip pertama');
@@ -83,12 +84,15 @@ check('renderFreq: kurva f(t) mengikuti sampel run (polyline non-kosong)', () =>
   if (!m) throw new Error('kurva f(t) harus polyline');
   if (m[1].split(' ').length < 10) throw new Error('kurva harus banyak titik');
 });
-check('renderFreq: label sumbu y 47–52 Hz & x 0–12 s', () => {
+check('renderFreq: label sumbu y 47–52 Hz & x 0–30 s (langkah 5 s)', () => {
   const s = A.renderFreq(impP, impRun, 2.2);
   ['47.0', '48.0', '49.0', '50.0', '51.0', '52.0'].forEach(v => {
     if (!s.includes('>' + v + '</text>')) throw new Error('label y ' + v + ' hilang');
   });
-  if (!s.includes('>0s<') || !s.includes('>6s<') || !s.includes('>12s<')) throw new Error('label x hilang');
+  ['0s', '5s', '15s', '30s'].forEach(v => {
+    if (!s.includes('>' + v + '<')) throw new Error('label x ' + v + ' hilang');
+  });
+  if (s.includes('>6s<') || s.includes('>12s<')) throw new Error('label x lama (6s/12s) tidak boleh ada');
 });
 
 /* ── renderGauge: batang gradien + penunjuk ── */

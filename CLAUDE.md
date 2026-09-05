@@ -14,7 +14,7 @@ langsung di browser atau `python -m http.server`.
 - Sumber kebenaran model: **`docs/PRD.md` §5** (rantai persamaan) + spesifikasi U01
   (module React LEVEL 3, `docs/engineering-specs/underfrequency-relay.md` — hanya
   dibaca sebagai referensi persamaan, TIDAK disentuh).
-- Keputusan desain: `docs/adr/0001–0005`, glosarium `CONTEXT.md`, riset PLN
+- Keputusan desain: `docs/adr/0001–0006`, glosarium `CONTEXT.md`, riset PLN
   `docs/research/pln-underfrequency-practice.md` (angka UFLS = praktik tipikal,
   berlabel ambar — belum diverifikasi ke pedoman resmi PLN).
 - Rencana implementasi (kontrak milestone): `docs/implementation-plan.md` — M0–M4
@@ -24,6 +24,13 @@ langsung di browser atau `python -m http.server`.
   komposisi 700×520 + font SVG ≥ 10, gauge hijau HANYA di pita 50,2–49,8, params
   kart-dalam-kart. Eksekusi & plan di `design-plans/plan-02-…`; log sesi di
   `design-plans/sesi-2026-09-05-01-…`.
+- **M6 (2026-09-05, plan-03 + ADR-0006)**: hierarki kendali f tiga lapis
+  **governor → AGC sekunder → UFLS** (AGC: +40 MW/s tiap 2 s, target pita 49,95,
+  proporsional headroom, langkah tangga; `agcOn` toggle OFF = perilaku lama); player
+  **real-time waktu-dinding** (1× = 1 s sim/s dinding) + throttle render berat ~10 fps
+  + auto-play saat klik skenario + skenario `imp` paksa preset berimpor; jendela
+  grafik **0–30 s** (`x=38+t/30·628`); chip SLD label AGC + baris `Dukungan AGC` +
+  indikator fase di kartu kanan. Plan: `design-plans/plan-03-…`.
 
 ## Log sesi & sinkronisasi dokumen (WAJIB — aturan root poin 8)
 
@@ -31,7 +38,8 @@ langsung di browser atau `python -m http.server`.
   (template `design-plans/sesi-TEMPLATE.md`): waktu mulai + commit sebelum → kegiatan
   & hasil (ringkas, dgn bukti tes/angka) → status → langkah berikutnya. Perbarui juga
   status header `design-plans/plan-*.md` yang dipakai (DRAF → DIEKSEKUSI → SELESAI).
-- Riwayat terbaru: `sesi-2026-09-05-01` (audit improve-ui → eksekusi M5, plan-02 SELESAI).
+- Riwayat terbaru: `sesi-2026-09-05-02` (eksekusi plan-03 M6: AGC + player real-time + jendela 30 s).
+  Sebelumnya: `sesi-2026-09-05-01` (audit improve-ui → eksekusi M5, plan-02 SELESAI).
 - **Sesi/AI baru mulai dari:** file ini → log sesi terbaru → plan ber-status DRAF/BELUM
   → kerjakan lanjutannya. Riwayat & arah tersimpan di file — jangan eksplorasi ulang.
 
@@ -115,7 +123,15 @@ play/speed/scrub/reset, tab kanan, collapse). Tidak ada build.
 - `pct` tahap UFLS = **fraksi** (0,05), bukan persen (5) — konversi `× beban dasar`.
 - `tools/shots/` & `tools/.tmp-*/` gitignored (artefak).
 - Prototipe `prototype.html` hidup di branch `prototype-v1` (aturan skill prototype).
-- Konstanta skala grafik dikunci (PRD §7): `y(f)=12+(52−f)/5·214`, `x(t)=38+t/12·628`;
-  gauge stops (M5): 0/36/38/44/62/100% (copper/copper/hijau/hijau/copper/merah — hijau
-  HANYA pita 50,2–49,8, over-frekuensi copper) — tes memakai literal.
+- Konstanta skala grafik dikunci (PRD §7 + ADR-0006): `y(f)=12+(52−f)/5·214`,
+  `x(t)=38+t/30·628` (jendela 0–30 s); gauge stops (M5): 0/36/38/44/62/100%
+  (copper/copper/hijau/hijau/copper/merah — hijau HANYA pita 50,2–49,8, over-frekuensi
+  copper) — tes memakai literal.
+- **Player (M6)**: `tick()` memakai `S.ui.lastT/lastHeavy/heavyN` — jangan balik ke
+  langkah tetap 0,05 s/frame. Klik skenario auto-play (`play()`); render berat
+  (grafik + kartu kanan) di-throttle ≥ 100 ms saat main — SLD/transport tiap frame.
+- **AGC (M6/ADR-0006)**: `run.agcSteps[].cum` = kumulatif per unit (dipakai chip SLD +
+  badge AGC); default produk `agcOn:true, agcRate:40, agcInterval:2`; `setAgc(on)`
+  recompute run penuh; `agcOn=false` harus tetap menghasilkan perilaku pra-ADR-0006
+  (literal 49,686 diuji). Jangan ubah tanpa amendemen PRD §5.4b/ADR-0006.
 - Windows + Git Bash: perintah POSIX (`ls`, `mv`, `rm`); warning LF→CRLF benign.

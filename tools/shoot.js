@@ -274,7 +274,9 @@ function asciiReport(name, pngPath, crop) {
   }
 }
 
-/* pilih preset (opsional) + skenario lewat DOM, lalu atur playhead & render ulang SLD */
+/* pilih preset (opsional) + skenario lewat DOM, lalu atur playhead & render ulang SLD.
+   Klik skenario kini AUTO-PLAY (plan-03 P0) — bekukan di sini agar screenshot statis
+deterministik; auto-play sendiri diverifikasi view `playcheck`. */
 function setScen(id, tNow, preset) {
   return `(() => {
     if (${preset ? `'${preset}'` : 'null'}) {
@@ -284,12 +286,61 @@ function setScen(id, tNow, preset) {
     }
     const btn = document.querySelector('#scenGroup button[data-scen="${id}"]');
     if (btn) btn.click();
+    S.ui.playing = false;
     S.ui.tNow = ${tNow};
     API.renderSldInto();
     API.renderCharts();
     API.renderSideInto();
     API.renderTransport();
   })()`;
+}
+
+/* playcheck (plan-03 S4): klik skenario → auto-play; tNow naik monoton ≥ 1 sim-s
+   per ≤ 1,4 wall-s @1×; render berat di-throttle (~10 fps → heavyN kecil); stop
+   bersih via klik ▶; tanpa exception konsol. */
+async function playcheck(cdp) {
+  cdp.pageErrors.length = 0;
+  const data = await evalJs(cdp, `(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const sel = document.getElementById('presetSel');
+    sel.value = 'mandiri'; sel.dispatchEvent(new Event('change')); // preset bersih
+    await sleep(80);
+    const btn = document.querySelector('#scenGroup button[data-scen="g3"]');
+    if (!btn) throw new Error('tombol skenario g3 tidak ada');
+    const heavy0 = S.ui.heavyN;
+    btn.click(); // auto-play
+    await sleep(60);
+    const wall0 = performance.now();
+    const samples = [];
+    while (performance.now() - wall0 < 1500) {
+      samples.push({ t: S.ui.tNow, playing: S.ui.playing, st: S.run && S.run.status });
+      await sleep(75);
+    }
+    const playingStill = S.ui.playing;
+    if (playingStill) document.getElementById('playBtn').click(); // jeda bersih
+    await sleep(40);
+    const stopped = !S.ui.playing;
+    const span = (samples[samples.length - 1].t - samples[0].t);
+    const wallS = (performance.now() - wall0) / 1000;
+    const mono = samples.every((s, i) => i === 0 || s.t >= samples[i - 1].t - 1e-6);
+    return {
+      played: samples.some(s => s.playing),
+      spanSim: Math.round(span * 1000) / 1000,
+      wallS: Math.round(wallS * 100) / 100,
+      mono,
+      stopped,
+      heavyDelta: S.ui.heavyN - heavy0,
+      heavyThrottled: (S.ui.heavyN - heavy0) <= Math.ceil(wallS * 1000 / 100) + 2,
+      errs: 0,
+      finalStatus: samples[samples.length - 1].st,
+      samples: samples.map(s => s.t)
+    };
+  })()`);
+  data.errs = cdp.pageErrors.length;
+  // kriteria plan-03 S4: tNow naik monoton ≥ 1 sim-s per ≤ 1,4 wall-s @1× → rasio ≥ 0,7
+  data.ratio = Math.round((data.spanSim / data.wallS) * 100) / 100;
+  const pass = data.played && data.mono && data.stopped && data.spanSim >= 1.0 && data.ratio >= 0.7 && data.heavyThrottled && data.errs === 0;
+  return { name: 'playcheck', metrics: { playcheck: data }, pass };
 }
 
 async function main() {
@@ -315,6 +366,9 @@ async function main() {
     await cdp.send('Page.navigate', { url: URL });
     await new Promise(r => setTimeout(r, 2300));
     results.push(await capture(cdp, 'splash-auto', `(typeof S !== 'undefined') && API.render();`));
+    // playcheck (plan-03 S4): auto-play, tNow naik real-time, throttle render, stop bersih
+    const pc = await playcheck(cdp);
+    const pcD = pc.metrics.playcheck;
     let rep = 'UFR simulator screenshot report\n';
     for (const r of results) {
       const m = r.metrics;
@@ -331,6 +385,10 @@ async function main() {
       if (m.svgFontDetail) rep += `  svgFontDetail: ${m.svgFontDetail}\n`;
       if (m.sld) rep += `  sld svg ${m.sld.w}x${m.sld.h} text[:120]="${m.sld.text.slice(0, 120)}"\n`;
     }
+    rep += `\n== playcheck (plan-03 S4) == ${pc.pass ? 'PASS' : 'FAIL'}\n`;
+    rep += `  played=${pcD.played} · spanSim=${pcD.spanSim} s per wallS=${pcD.wallS} s (rasio ${pcD.ratio} ≥ 0,7) · monoton=${pcD.mono}\n`;
+    rep += `  stop-bersih=${pcD.stopped} · heavyN=${pcD.heavyDelta} (≤ ~10/s: ${pcD.heavyThrottled}) · consoleErrors=${pcD.errs}\n`;
+    rep += `  samples t: ${pcD.samples.join(' ')} · status-akhir="${pcD.finalStatus || ''}"\n`;
     fs.writeFileSync(path.join(SHOTS, 'report.txt'), rep);
     console.log('done. report → tools/shots/report.txt');
   } finally {

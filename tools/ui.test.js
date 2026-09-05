@@ -106,10 +106,10 @@ check('tidak ada KaTeX & tidak ada kartu ringkasan dot (kartu kanan = tab)', () 
   if (src.toLowerCase().includes('katex')) throw new Error('KaTeX dilarang (inline SVG saja)');
   if (src.includes('dot-summary')) throw new Error('kartu ringkasan lama tidak dipakai');
 });
-check('collapse: S.ui.collapsed 4 kartu; all-collapsed → paddingTop set; expand → kosong', () => {
+check('collapse: S.ui.collapsed 5 kartu (unit/beban/kendali/skenario/tentang); all-collapsed → paddingTop set; expand → kosong', () => {
   const keys = Object.keys(A.S.ui.collapsed).sort();
-  if (JSON.stringify(keys) !== JSON.stringify(['beban', 'skenario', 'tentang', 'unit'])) {
-    throw new Error('kartu collapse harus 4: ' + JSON.stringify(keys));
+  if (JSON.stringify(keys) !== JSON.stringify(['beban', 'kendali', 'skenario', 'tentang', 'unit'])) {
+    throw new Error('kartu collapse harus 5: ' + JSON.stringify(keys));
   }
   A.setAllCollapsed(true);
   if (!A.S.ui.collapsed.unit || !A.S.ui.collapsed.beban) throw new Error('harus semua ciut');
@@ -134,16 +134,24 @@ check('qTip: hover elemen ? → tampil + posisi; out → sembunyi', () => {
   A.qTipOut({ target: { closest: () => ({ dataset: { tip: 'x' } }) } });
   if (tip.className !== '') throw new Error('qTip harus sembunyi');
 });
-check('status pill mengikuti playhead: skenario impor di t akhir → PELEPASAN BEBAN', () => {
+check('status pill mengikuti playhead: skenario impor — t awal PELEPASAN BEBAN, t akhir PEMULIHAN (AGC pulihkan)', () => {
   const p = A.paramP(); p.importMw = 400; p.loadMw = 1500; p.scenario = { kind: 'importLoss' };
   const run = A.ufTimeline(JSON.parse(JSON.stringify(p)));
-  A.S.ui.tNow = run.tMax;
+  // t di tengah cascade (setelah T1, sebelum AGC tuntas) → masih PELEPASAN BEBAN
+  A.S.ui.tNow = run.tripSeq[0].t + 0.5;
   A.S.run = run;
   A.S.param.scenario = { kind: 'importLoss' };
   A.renderSldInto();
   const tag = ctx.els.sldTag;
   if (!tag || tag.textContent.indexOf('PELEPASAN BEBAN') === -1) {
-    throw new Error('pill harus PELEPASAN BEBAN, dapat: ' + (tag && tag.textContent));
+    throw new Error('pill di t tengah harus PELEPASAN BEBAN, dapat: ' + (tag && tag.textContent));
+  }
+  // t akhir: AGC memulihkan f ke 50 → PEMULIHAN
+  A.S.ui.tNow = run.tMax;
+  A.renderSldInto();
+  const tag2 = ctx.els.sldTag;
+  if (!tag2 || tag2.textContent.indexOf('PEMULIHAN') === -1) {
+    throw new Error('pill di t akhir harus PEMULIHAN (AGC), dapat: ' + (tag2 && tag2.textContent));
   }
   A.S.ui.tNow = 0;
   A.S.param.scenario = { kind: 'none' };
@@ -228,6 +236,59 @@ check('M5: kart-dalam-kart — renderGenList menghasilkan .gencard per generator
   A.render();
   const n = (ctx.els.genList.innerHTML.match(/class="gencard"/g) || []).length;
   if (n !== A.S.param.gens.length) throw new Error('.gencard harus = jumlah gens, dapat ' + n);
+});
+
+/* ===== plan-03: AGC sekunder — toggle, kartu kanan, fase kendali (P3) ===== */
+check('P3: kartu Kendali frekuensi — kontainer #agcGroup + kartu; tombol ON/OFF dibangun renderAgcCtl', () => {
+  contains(src, 'id="agcGroup"', 'kontainer toggle AGC');
+  contains(src, 'data-card="kendali"', 'kartu kendali');
+  contains(src, 'AGC sekunder', 'label kartu');
+  A.render();
+  const h = ctx.els.agcGroup ? ctx.els.agcGroup.innerHTML : '';
+  if (!h.includes('data-agc="1"') || !h.includes('data-agc="0"')) throw new Error('renderAgcCtl harus memuat tombol ON/OFF');
+  if (!/class="active" data-agc="1"/.test(h)) throw new Error('ON harus active saat default agcOn=true');
+});
+check('P3: toggle AGC mengubah run (seam setAgc) — ON pulih ke 50; OFF perilaku lama 49,686', () => {
+  A.S.param.scenario = { kind: 'loadStep', mw: 200 };
+  A.setAgc(true);
+  const runOn = A.S.run;
+  if (!runOn.agcRecovered || Math.abs(runOn.finalF - 50) > 1e-6) {
+    throw new Error('AGC ON: +200 harus pulih ke 50, dapat ' + runOn.finalF);
+  }
+  A.setAgc(false);
+  const runOff = A.S.run;
+  if (runOff.agcDispatch !== 0 || Math.abs(runOff.finalF - 49.686) > 1e-3) {
+    throw new Error('AGC OFF: finalF harus 49,686 (perilaku lama), dapat ' + runOff.finalF);
+  }
+  A.setAgc(true); // kembalikan default
+  A.S.param.scenario = { kind: 'none' };
+  A.computeRun();
+});
+check('P3: side card Kondisi — baris Dukungan AGC + indikator fase (aktif ditebalkan)', () => {
+  const p = A.paramP(); p.scenario = { kind: 'loadStep', mw: 200 };
+  const run = A.ufTimeline(JSON.parse(JSON.stringify(p)));
+  const tAgc = run.agcSteps.length ? run.agcSteps[0].t : -1;
+  if (tAgc < 0) throw new Error('+200 harus punya langkah AGC');
+  const hMid = A.renderSide(p, run, tAgc + 0.1, 'kondisi');
+  if (hMid.indexOf('Dukungan AGC') === -1) throw new Error('baris Dukungan AGC hilang');
+  if (hMid.indexOf('GOVERNOR') === -1 || hMid.indexOf('UFLS') === -1) throw new Error('indikator fase hilang');
+  if (hMid.indexOf('ph-on">AGC<') === -1) throw new Error('saat AGC bekerja, fase AGC harus ditebalkan (ph-on)');
+  const hEnd = A.renderSide(p, run, run.tMax, 'kondisi');
+  const m = hEnd.match(/Dukungan AGC<\/span><b>\+(\d+) MW<\/b>/);
+  if (!m || parseInt(m[1], 10) < 195) throw new Error('Dukungan AGC akhir harus ≈ +200 MW, dapat ' + (m && m[1]));
+  // RUNTUH: fase UFLS yang ditebalkan
+  const pC = A.paramP(); pC.scenario = { kind: 'collapse', mw: 1000 };
+  const runC = A.ufTimeline(JSON.parse(JSON.stringify(pC)));
+  const hC = A.renderSide(pC, runC, runC.tMax, 'kondisi');
+  if (hC.indexOf('RUNTUH') === -1 || hC.indexOf('ph-on">UFLS<') === -1) throw new Error('collapse harus fase UFLS aktif');
+});
+check('P3: AGC OFF → tanpa langkah; side Dukungan AGC 0 MW & fase GOVERNOR saat defisit', () => {
+  const p = A.paramP(); p.scenario = { kind: 'loadStep', mw: 200 }; p.agcOn = false;
+  const run = A.ufTimeline(JSON.parse(JSON.stringify(p)));
+  if (run.agcSteps.length !== 0) throw new Error('agcOn=false tidak boleh ada langkah AGC');
+  const h = A.renderSide(p, run, run.tMax, 'kondisi');
+  if (!h.includes('Dukungan AGC</span><b>0 MW</b>')) throw new Error('off harus 0 MW');
+  if (h.indexOf('ph-on">GOVERNOR<') === -1) throw new Error('tanpa AGC, fase governor harus aktif saat defisit');
 });
 
 console.log(`\n${passed} lulus, ${failed} gagal`);

@@ -192,6 +192,16 @@ P_i(t) = clamp(P0_i + resp_i, 0, G_i)                  (saturasi headroom)
 Kekakuan agregat (tak jenuh): `β_pu = Σ_online MVA_i/R_i`; dengan saturasi, β efektif
 turun per unit yang mencapai `G_i` — diselesaikan piecewise (lihat 5.6).
 
+### 5.4b AGC sekunder — kendali #2 antara governor & UFLS (ADR-0006, plan-03)
+Setelah governor setimbang dan f masih di bawah pita kendali sekunder
+(`AGC_BAND = ±0,05 Hz` → target 49,95), AGC menaikkan setpoint unit dalam langkah
+**diskret terjadwal**: tiap `agcInterval` s (default **2 s**) sebesar `agcRate` MW/s
+total (default **40 MW/s**), dibagi **proporsional headroom** (`govMax − P0`) unit
+online; `P0` unit ikut dinaikkan sehingga kurva f berbentuk **tangga** (ciri kendali
+sekunder). Besar langkah dijepit ke defisit efektif segmen saat itu (tidak
+over-dispatch). AGC berhenti bila: f kembali ke pita ≥ 49,95 · reserve habis ·
+terjadi UFLS (dijeda 2 s setelah tiap trip) · run RUNTUH · `agcOn=false`.
+
 ### 5.5 ROCOF & integrasi waktu (persamaan ayunan)
 ```
 ROCOF awal: df/dt|₀ = −(f_nom/(2·H_sys)) · (D₀/S_base)          [Hz/s]
@@ -201,7 +211,10 @@ Antara dua "kejadian" (peristiwa / unit jenuh / tahap UFLS trip), defisit efekti
 konstan → `f(t)` mengecil/naik **bentuk-tertutup eksponensial** menuju
 `f_ss = f_nom − D_eff/β_eff` (bila ada), waktu tunda dihitung eksak per segmen
 (detail integrasi U01 §8). Urutan kejadian ditentukan deterministik dari waktu
-terselesaikan (bukan langkah waktu tetap).
+terselesaikan (bukan langkah waktu tetap). Langkah AGC (5.4b) diperlakukan sebagai
+"kejadian" terjadwal pada waktunya sendiri (sama deterministik). Playback memakai
+**waktu dinding**: 1× = 1 s engineering per 1 s nyata (0,5×/2× proporsional),
+sehingga operasi governor/AGC 0–30 s terlihat seperti waktu nyata (ADR-0006).
 
 ### 5.6 Keadaan mantap & RUNTUH
 - Bila dengan semua unit jenuh (ΣG_i < beban efektif) tetap ada defisit, dan/atau
@@ -209,6 +222,8 @@ terselesaikan (bukan langkah waktu tetap).
   `f` terus turun (klip presentasi), status `RUNTUH`, V menuju lantai (5.8).
 - Bila kesetimbangan tercapai di atas ambang tahap terendah yang belum trip → **PULIH**
   ke `f_ss` baru (bisa < 50 Hz selama defisit residual ditahan governor/shedding).
+  Bila reserve AGC masih cukup, AGC sekunder (5.4b) membawa f **kembali ke pita
+  49,95–50 Hz** (status PEMULIHAN 50,00) — beda utama vs perilaku pra-ADR-0006.
 
 ### 5.7 UFLS berjenjang
 - Tiap tahap s: `ambang_s`, `tunda_s` (disengaja), `fraksi_s`.
@@ -267,14 +282,16 @@ Tidak ada auth/Clerk di v1 (keputusan Round 1). Bahasa UI/dokumen = Indonesia.
 
 1. **Indikator batang gradien (dipilih user: "batang gradien + penunjuk")**:
    kartu grafik frekuensi memuat kolom gauge 74×250 px; batang 18×214 px dengan
-   `linearGradient` stops: `0% #2E7D46`, `40% #2E7D46` (50 Hz masih hijau),
-   `55% #B5651D`, `100% #C0392B` (47 Hz merah); penunjuk garis kiri pada y(f),
-   tick 47–52, nilai f di bawah gauge.
+   `linearGradient` stops (revisi M5/plan-02 §4.4b — hijau HANYA di pita normal):
+   `0% #B5651D` (52 Hz over-frekuensi), `36% #B5651D`, `38% #2E7D46` (hijau mulai),
+   `44% #2E7D46` (49,8 Hz), `62% #B5651D`, `100% #C0392B` (47 Hz merah); penunjuk
+   garis kiri pada y(f), tick 47–52, nilai f di bawah gauge.
 2. **Konstanta tegangan ilustratif DIKUNCI**: `k_V = 0,5`, τ turun ≈0,2 s,
    τ pulih ≈3 s, lantai 0,85 pu — sesuai §5.8 (diverifikasi via timeline tests
    + screenshots; dip aksen di SLD & kurva).
-3. **Jendela x grafik DIKUNCI 0–12 s** (skala `x(t) = 38 + t/12·628`); sampel
-   run di luar 12 s ter-klip; scrubber mengikuti `tMax` run (bisa > 12 s).
+3. **Jendela x grafik DIKUNCI 0–30 s** (ADR-0006/plan-03 P1, dulu 0–12 s): skala
+   `x(t) = 38 + t/30·628`, label 0/5/…/30 s; sampel run di luar 30 s ter-klip;
+   scrubber mengikuti `tMax` run (= 30 s di UI).
 4. Skala frekuensi DIKUNCI 47–52 Hz (`y(f) = 12 + (52−f)/5·214`), grid 0,5 Hz,
    pita normal ±0,2 Hz, ambang UFLS putus-putus copper berlabel T1–T4, penanda
    peristiwa (t = 1,0 s) & trip (lingkaran merah) sampai playhead.

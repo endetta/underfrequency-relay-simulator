@@ -142,6 +142,7 @@
   .legend span{display:inline-flex;align-items:center;gap:5px;}
   .legend i{width:10px;height:10px;border-radius:3px;display:inline-block;flex:none;}
   .legend i.brkopen{background:var(--surface);border:1.5px solid var(--red);transform:rotate(45deg);border-radius:2px;}
+  .legend i.agcdot{background:var(--surface);border:1.5px solid var(--copper);}
 
   /* ===== transport kompak (satu baris ramping, tinggi ≤ 40 px) ===== */
   .transport{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);
@@ -184,6 +185,11 @@
   .side-body .total{margin-top:10px;font-size:12px;text-align:right;}
   .side-body .total b{color:var(--red);}
   .side-body .none{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-soft);text-align:center;padding:34px 0;}
+  .side-body .phase{display:flex;align-items:center;gap:5px;margin-top:10px;padding-top:8px;border-top:1px solid var(--line);font-size:10px;color:var(--ink-soft);flex-wrap:wrap;}
+  .side-body .phase .phlbl{font-family:'Inter',sans-serif;margin-right:2px;}
+  .side-body .phase i{font-style:normal;color:var(--line-strong);font-size:9px;}
+  .side-body .phase .ph{font-family:'JetBrains Mono',monospace;font-weight:400;color:var(--ink-soft);padding:2px 5px;border-radius:4px;border:1px solid transparent;}
+  .side-body .phase .ph.ph-on{font-weight:700;color:var(--copper-deep);background:var(--copper-soft);border-color:var(--copper);}
 
   /* ===== splash pembuka (seam Differential/Distance) ===== */
   #root{position:relative;}
@@ -276,6 +282,17 @@
           </div></div>
         </div>
 
+        <div class="card" data-card="kendali">
+          <div class="card-h"><span class="dot"></span>Kendali frekuensi<span class="chev">▾</span></div>
+          <div class="card-b"><div class="card-b-i">
+            <div class="field">
+              <label><span>AGC sekunder (kendali #2)</span><span class="qline"><span class="q" data-tip="Lapisan 2 dari 3 (governor droop → AGC → UFLS). AGC menaikkan setpoint unit tiap interval saat f masih &lt; 49,95 Hz; UFLS hanya bekerja bila AGC tak mampu menahan.">?</span></span></label>
+              <div class="btngroup" id="agcGroup"></div>
+            </div>
+            <div class="warn" style="margin-top:9px">Naik <b>40 MW/s</b> tiap <b>2 s</b> (angka label praktik). Klik skenario = <b>auto-play ▶</b>; jeda = klik ▶ lagi.</div>
+          </div></div>
+        </div>
+
         <div class="card" data-card="skenario">
           <div class="card-h"><span class="dot"></span>Skenario peristiwa<span class="chev">▾</span></div>
           <div class="card-b"><div class="card-b-i">
@@ -316,6 +333,7 @@
             <span><i style="background:var(--copper)"></i>batas governor</span>
             <span><i style="background:var(--teal)"></i>beban vital</span>
             <span><i class="brkopen"></i>pemutus terbuka</span>
+            <span><i class="agcdot"></i>AGC aktif</span>
           </div>
         </div>
       </div>
@@ -485,6 +503,9 @@ function ufValidate(P) {
   if (!P || typeof P.fNom !== 'number' || !(P.fNom > 0)) issues.push({ code: 'INVALID_PARAM', msg: 'fNominalHz harus > 0' });
   if (!P || !(P.loadMw >= 0)) issues.push({ code: 'INVALID_PARAM', msg: 'beban harus >= 0' });
   if (!P || !(P.importMw >= 0)) issues.push({ code: 'INVALID_PARAM', msg: 'impor harus >= 0' });
+  if (P && P.agcOn !== undefined && typeof P.agcOn !== 'boolean') issues.push({ code: 'INVALID_PARAM', msg: 'agcOn harus boolean' });
+  if (P && P.agcRate !== undefined && !(P.agcRate >= 0)) issues.push({ code: 'INVALID_PARAM', msg: 'agcRate harus >= 0 MW/s' });
+  if (P && P.agcInterval !== undefined && !(P.agcInterval >= 0.5)) issues.push({ code: 'INVALID_PARAM', msg: 'agcInterval harus >= 0,5 s' });
   (P && P.gens || []).forEach(function (g) {
     if (!(g.h > 0)) issues.push({ code: 'INVALID_PARAM', msg: 'H ' + g.id + ' harus > 0' });
     if (!(g.r > 0)) issues.push({ code: 'INVALID_PARAM', msg: 'R ' + g.id + ' harus > 0' });
@@ -553,11 +574,20 @@ function ufEvaluateStatic(P) {
   return { status: 'SETTLED', steadyStateHz: r2.fSs, totalShed: totalShed, operated: operated, initialRocofHzPerSec: initialRocof(gens, D0), initialDeficitMw: D0 };
 }
 
-/* ── 10. Timeline event-driven (deterministik) — PRD §5.5–5.8 / U01 §8 ── */
+/* ── 10. Timeline event-driven (deterministik) — PRD §5.5–5.8 / U01 §8
+   Lapisan kendali (plan-03, ADR-0006): governor droop → AGC sekunder → UFLS.
+   AGC (PRD §5.4b): setelah governor setimbang & f masih < 49,99, setpoint unit
+   dinaikkan langkah diskret tiap agcInterval s sebesar agcRate MW/s (total), dibagi
+   proporsional headroom; berhenti saat f_ss ≥ 49,99 / reserve habis / UFLS trip /
+   agcOn=false. Discretisasi menjadikan kurva f bertangga (ciri kendali sekunder). ── */
 function ufTimeline(P) {
   var F0 = P.fNom || 50;
   var TMAX = P.tMax || 20;
   var TEV = P.tEvent || 1.0;
+  var AGC_ON = P.agcOn !== false;
+  var AGC_RATE = (P.agcRate !== undefined) ? clamp1(P.agcRate, 0, 500) : 40;  // MW/s total
+  var AGC_INT = (P.agcInterval !== undefined) ? clamp1(P.agcInterval, 0.5, 60) : 2; // s per langkah
+  var AGC_BAND = 0.05; // AGC berhenti saat f_ss ≥ 49,95 (±0,05 = pita mati kendali sekunder)
   var gens = P.gens.map(function (g) { return Object.assign({}, g); });
   var stages = P.stages.map(function (s) { return { id: s.id, thr: s.thr, delay: s.delay, pct: s.pct, latched: false, timer: 0 }; });
   var load = P.loadMw, imp = P.importMw || 0;
@@ -567,6 +597,9 @@ function ufTimeline(P) {
   var t = 0, f = F0, V = 1.0, prevF = f;
   var ts = [], fs = [], vs = [], ev = [], tripSeq = [];
   var collapse = false, settled = false, arrAt = -1, dip = 0, pendingEvent = scn.kind !== 'none';
+  var agcActive = false, agcDispatch = 0, agcStep = 0, agcNext = -1, agcSteps = [];
+  var genCum = {}; // kumulatif setpoint AGC per unit (untuk chip SLD, plan-03 P3)
+  if (AGC_ON) agcNext = TEV + AGC_INT;
 
   function byId(id) { for (var i = 0; i < gens.length; i++) if (gens[i].id === id) return gens[i]; return null; }
   function pushSamples() { ts.push(t); fs.push(f); vs.push(V); }
@@ -582,6 +615,46 @@ function ufTimeline(P) {
     var D0 = load - a.pGen0 - imp;
     dip = Math.min(0.15, 0.5 * D0 / (a.sBase || 1));
     ev.push({ t: t, kind: 'event', txt: txt, rocof0: initialRocof(gens, D0), d0: D0 });
+  }
+
+  /* AGC (ADR-0006 / PRD §5.4b) — kendali sekunder. Droop (primer) menahan f
+     secara f-driven; AGC menggeser setpoint unit (p0) dalam langkah diskret tiap
+     agcInterval s sebesar agcRate MW/s (total), dibagi proporsional headroom.
+     Besar langkah dijepit ke defisit efektif (agcDeficitNow) sehingga AGC menutup
+     celah menuju nominal tanpa over-dispatch. */
+  /* Sisa reserve yang masih bisa dipakai AGC (headroom belum terpakai droop/AGC). */
+  function agcReserveNow() {
+    var res = 0;
+    gens.forEach(function (g) {
+      if (!g.online) return;
+      res += Math.max(0, g.govMax - g.p0);
+    });
+    return res;
+  }
+  /* Langkah AGC (ADR-0006 / PRD §5.4b). */
+  function agcDispatchStep() {
+    var need = Math.max(0, agcDeficitNow());
+    var tot = Math.min(AGC_RATE * AGC_INT, need, agcReserveNow());
+    if (!(tot > 1e-9)) { agcActive = false; return; }
+    var avail = 0;
+    gens.forEach(function (g) {
+      if (!g.online) return;
+      avail += Math.max(0, g.govMax - g.p0);
+    });
+    if (!(avail > 1e-9)) { agcActive = false; return; }
+    gens.forEach(function (g) {
+      if (!g.online) return;
+      var hr = Math.max(0, g.govMax - g.p0);
+      if (hr <= 0) return;
+      var d = Math.min(hr, tot * hr / avail);
+      g.p0 += d;
+      genCum[g.id] = (genCum[g.id] || 0) + d;
+    });
+    agcDispatch += tot;
+    agcStep += 1;
+    agcActive = true;
+    agcSteps.push({ t: t, mw: tot, fAfter: 0, cum: Object.assign({}, genCum) });
+    pushSamples();
   }
 
   function seg() { // parameter segmen utk f saat ini (set jenuh mengikuti f)
@@ -616,11 +689,45 @@ function ufTimeline(P) {
     return tau2 > 1e-9 ? tau2 : -1;
   }
 
+  /* Defisit efektif saat ini konsisten dgn segmen timeline (droop jenuh piecewise,
+     bukan linear tanpa batas). Ini defisit yang benar-benar harus ditutup AGC. */
+  function agcDeficitNow() {
+    return Math.max(0, seg().Deff);
+  }
+  /* Apakah AGC masih perlu beraksi? — f di bawah pita target, masih ada reserve,
+     dan defisit segmen masih positif (tidak over-dispatch). Timer UFLS yang
+     berjalan TIDAK menghalangi: AGC adalah lapisan kedua (governor → AGC → UFLS)
+     yang berusaha menahan sebelum shedding bekerja. */
+  function agcStillNeeded() {
+    if (!AGC_ON) return false;
+    if (agcReserveNow() <= 1e-9) return false;
+    if (f >= F0 - AGC_BAND) return false;
+    if (collapse) return false;
+    if (agcDeficitNow() <= 1e-9) return false;
+    return true;
+  }
+
   pushSamples();
   var iter = 0;
   while (iter++ < 6000 && t < TMAX) {
     if (pendingEvent && t >= TEV - 1e-9) { pendingEvent = false; applyEvent(); }
     var s = seg();
+    var sK = s.K;
+    // AGC: langkah diskret terjadwal (governor → AGC → UFLS). AGC ikut mencoba
+    // saat f di bawah pita selama masih ada reserve & defisit (lapisan kedua),
+    // tetapi dijeda 2 s setelah pelepasan UFLS (garis terakhir PLN).
+    if (AGC_ON && agcNext > 0 && t >= agcNext - 1e-9 && !pendingEvent && !collapse
+        && agcReserveNow() > 1e-9 && f < F0 - AGC_BAND && agcStillNeeded()) {
+      agcNext = agcNext + AGC_INT;
+      agcDispatchStep();
+      if (agcSteps.length) agcSteps[agcSteps.length - 1].fAfter = f;
+      // sisa defisit & fss baru setelah langkah (efek tangga)
+      s = seg();
+      // AGC selesai bila tak ada lagi yang bisa dilakukan: reserve habis atau
+      // langkah tak mengubah reserve (defisit sudah nol). Pita target dipakai
+      // di kondisi henti-dini (settle) — di sini AGC terus mencoba sampai tuntas.
+      if (agcReserveNow() <= 1e-9) agcNext = -1;
+    }
     var dts = [];
     if (pendingEvent && t < TEV) dts.push(TEV - t);
     gens.forEach(function (g) {
@@ -640,6 +747,7 @@ function ufTimeline(P) {
     f = s.K > 1e-12 ? s.fss + (f - s.fss) * Math.exp(-s.K * dt) : f + dslope(s) * dt;
     t += dt;
     if (f < 47.0) { f = 47.0; }
+    var trippedNow = false;
     stages.forEach(function (st) {
       if (st.latched) return;
       if (f < st.thr && !nearlyEqual(f, st.thr)) st.timer += dt; else st.timer = 0;
@@ -649,8 +757,10 @@ function ufTimeline(P) {
         var before = load; load -= mw;
         ev.push({ t: t, kind: 'trip', stage: st.id, mw: mw, fAt: f });
         tripSeq.push({ stage: st.id, t: t, fAt: f, mw: mw, loadBefore: before, loadAfter: load });
+        trippedNow = true;
       }
     });
+    if (trippedNow) { agcNext = t + AGC_INT; } // AGC jeda setelah pelepasan (PLN: UFLS garis terakhir)
     // tegangan ilustratif (PRD §5.8)
     if (ev.length) {
       if (collapse) { V = Math.max(0.85, V - 0.02); }
@@ -659,7 +769,12 @@ function ufTimeline(P) {
       else { V = 1 - dip * Math.exp(-(t - arrAt) / 3); if (V < 0.85) V = 0.85; }
     }
     pushSamples();
-    if (s.K > 1e-12 && Math.abs(f - s.fss) < 1e-7 && !pendingEvent && stages.every(function (st) { return st.timer === 0; })) {
+    // Henti-dini hanya saat sistem tenang (tak ada timer UFLS) dan tak ada lagi
+    // aksi AGC terjadwal (AGC OFF / f sudah di pita / reserve habis).
+    var inBand = f >= F0 - AGC_BAND;
+    var noTimers = stages.every(function (st) { return st.timer === 0; });
+    var agcDone = !AGC_ON || !agcStillNeeded();
+    if (s.K > 1e-12 && Math.abs(f - s.fss) < 1e-7 && !pendingEvent && noTimers && agcDone) {
       f = s.fss; settled = true; break;
     }
     if (f <= 47.0 + 1e-9) {
@@ -673,11 +788,20 @@ function ufTimeline(P) {
     if (s2.K > 1e-12 && Math.abs(f - s2.fss) < 1e-4) { f = s2.fss; }
   }
   var finalStatus = collapse ? 'RUNTUH' : ufStatus(f, { trips: tripSeq.length, fNom: F0 });
+  var agcLog = agcSteps.map(function (x) {
+    return { t: x.t, mw: Math.round(x.mw), fAfter: x.fAfter, cum: x.cum };
+  });
   return {
     tMax: t, finalF: f, finalV: V, collapse: collapse, settled: settled,
     status: finalStatus, ts: ts, fs: fs, vs: vs, ev: ev, tripSeq: tripSeq,
     totalShed: tripSeq.reduce(function (a, x) { return a + x.mw; }, 0),
-    finalDeficit: seg().Deff
+    finalDeficit: seg().Deff,
+    // AGC: total dispatch, jumlah langkah, jejak langkah, fase aktif (f masih di
+    // bawah pita & AGC masih bekerja), dan pulih (f kembali ke pita via AGC,
+    // baik dgn maupun tanpa shedding sebelumnya).
+    agcDispatch: agcDispatch, agcStep: agcStep, agcSteps: agcLog,
+    agcActive: agcActive && f < F0 - AGC_BAND,
+    agcRecovered: !collapse && f >= F0 - AGC_BAND && agcDispatch > 0
   };
 }
 
@@ -689,22 +813,26 @@ var S = {
     gens: clone(DEFAULT_GENS),
     loadMw: 1100, importMw: 0,
     stages: clone(DEFAULT_STAGES),
-    scenario: { kind: 'none' }
+    scenario: { kind: 'none' },
+    agcOn: true, agcRate: 40, agcInterval: 2 // kendali sekunder (ADR-0006, plan-03)
   },
   ui: {
-    collapsed: { unit: false, beban: false, skenario: false, tentang: false },
+    collapsed: { unit: false, beban: false, kendali: false, skenario: false, tentang: false },
     sideTab: 'kondisi',
     view: 'sld', // tampilan tengah (plan-02 §4.2): 'sld' | 'graf'
-    playing: false, speed: 1, tNow: 0
+    playing: false, speed: 1, tNow: 0,
+    // player real-time (plan-03 P0): basis waktu dinding + throttle render berat
+    lastT: null, lastHeavy: 0, heavyN: 0
   },
   run: null
 };
 
-function paramP() { // P untuk mesin murni (skenario + fNom/tMax/tEvent)
+function paramP() { // P untuk mesin murni (skenario + fNom/tMax/tEvent + AGC)
   return {
-    fNom: 50, tMax: 20, tEvent: 1.0,
+    fNom: 50, tMax: 30, tEvent: 1.0,
     gens: clone(S.param.gens), loadMw: S.param.loadMw, importMw: S.param.importMw,
-    stages: clone(S.param.stages), scenario: clone(S.param.scenario)
+    stages: clone(S.param.stages), scenario: clone(S.param.scenario),
+    agcOn: S.param.agcOn, agcRate: S.param.agcRate, agcInterval: S.param.agcInterval
   };
 }
 function computeRun() { S.run = ufTimeline(paramP()); if (S.ui.tNow > S.run.tMax) S.ui.tNow = 0; }
@@ -731,6 +859,14 @@ function renderSld(p, t, run) {
   var shedTotal = trips.reduce(function (a, x) { return a + x.mw; }, 0);
   var loadNow = p.loadMw + loadExtra - shedTotal;
   var gov = ufGovernorAt(gens, f);
+  // kumulatif setpoint AGC per unit sampai playhead (plan-03 P3): diambil dari
+  // langkah AGC terakhir yang sudah terjadi (run.agcSteps[i].cum = snapshot).
+  var agcCum = {};
+  if (run && run.agcSteps && run.agcSteps.length) {
+    for (var ai = run.agcSteps.length - 1; ai >= 0; ai--) {
+      if (run.agcSteps[ai].t <= t + 1e-9) { if (run.agcSteps[ai].cum) agcCum = run.agcSteps[ai].cum; break; }
+    }
+  }
   var out = [];
 
   /* ── bus (y=260, plan-02 §4.3) ── */
@@ -762,9 +898,10 @@ function renderSld(p, t, run) {
     out.push('<line class="xc" x1="' + (x - 15) + '" y1="307" x2="' + (x + 15) + '" y2="337" stroke="' + (isOff ? '#C9CDD2' : '#16233A') + '" stroke-width="2"/>');
     out.push('<line class="xc" x1="' + (x - 15) + '" y1="337" x2="' + (x + 15) + '" y2="307" stroke="' + (isOff ? '#C9CDD2' : '#16233A') + '" stroke-width="2"/>');
     out.push('<text x="' + x + '" y="364" text-anchor="middle" font-size="12" font-family="Space Grotesk,sans-serif" font-weight="600" fill="#16233A">' + g.id + '</text>');
-    // chip samping kanan: status + RPM + MW
+    // chip samping kanan: status + RPM + MW (droop + setpoint AGC; cap di govMax)
     var rpm = isOff ? 0 : Math.round(120 * f / g.poles); // n = 120·f/P (P = kutub)
-    var mw = isOff ? 0 : g.p0 + gov.resp[g.id];
+    var mw = isOff ? 0 : g.p0 + gov.resp[g.id] + (agcCum[g.id] || 0);
+    if (!isOff && g.govMax > g.p0) mw = Math.min(mw, g.govMax);
     var sat = !isOff && g.govMax > g.p0 && gov.resp[g.id] >= g.govMax - g.p0 - 1e-9 && f < 50;
     var chipBg = isOff ? '#EEF0F2' : (sat ? '#F5E9DC' : '#E3F1E7');
     var chipBd = isOff ? '#C9CDD2' : (sat ? '#B5651D' : '#2E7D46');
@@ -773,6 +910,11 @@ function renderSld(p, t, run) {
     out.push('<text x="' + cx + '" y="315" text-anchor="middle" font-size="12" font-weight="600" font-family="JetBrains Mono,monospace" fill="#16233A">' + (isOff ? 'TRIP' : 'RPM ' + rpm) + '</text>');
     out.push('<text class="chipmw" x="' + cx + '" y="331" text-anchor="middle" font-size="11" font-family="JetBrains Mono,monospace" fill="' + (isOff ? '#C9CDD2' : (sat ? '#8C4E16' : '#2E7D46')) + '">'
       + (isOff ? '0 MW' : (sat ? Math.round(mw) + ' MW · maks gov' : Math.round(mw) + ' MW')) + '</text>');
+    // label kecil AGC (plan-03 P3): unit yang menerima setpoint kendali sekunder
+    if (!isOff && (agcCum[g.id] || 0) > 0.5) {
+      out.push('<rect class="agctag" x="' + (cx - 16) + '" y="282" width="32" height="13" rx="4" fill="#F5E9DC" stroke="#B5651D" stroke-width="1"/>');
+      out.push('<text x="' + cx + '" y="291.5" text-anchor="middle" font-size="10" font-weight="600" font-family="JetBrains Mono,monospace" fill="#8C4E16">AGC</text>');
+    }
   });
 
   /* ── feeder beban (atas bus): T1–T4 hijau + VITAL teal, garis solid ── */
@@ -802,12 +944,12 @@ function renderSld(p, t, run) {
 }
 
 /* ═══════════════ 13b. Renderer grafik (murni, diuji tools/charts.test.js) ═══════════════
-   Skala literal: jendela waktu 0–12 s; frekuensi 47–52 Hz dengan
-   y(f) = 12 + (52−f)/5·214 dan x(t) = 38 + t/12·628. Kelas kunci utk tes:
+   Skala literal: jendela waktu 0–30 s (plan-03 P1); frekuensi 47–52 Hz dengan
+   y(f) = 12 + (52−f)/5·214 dan x(t) = 38 + t/30·628. Kelas kunci utk tes:
    .band (pita normal), .thr (ambang UFLS), .ev (peristiwa), .trip (trip),
    .floor (lantai tegangan), .pt (penunjuk gauge). */
 function fToY(f) { return 12 + (52 - f) / 5 * 214; }
-function tToX(t) { return 38 + t / 12 * 628; }
+function tToX(t) { return 38 + t / 30 * 628; }
 
 function renderFreq(p, run, t) {
   var out = [];
@@ -820,8 +962,8 @@ function renderFreq(p, run, t) {
   for (var fl = 47; fl <= 52; fl++) {
     out.push('<text x="32" y="' + (fToY(fl) + 4).toFixed(1) + '" text-anchor="end" font-size="10.5" font-family="JetBrains Mono,monospace" fill="#4A5568">' + fl.toFixed(1) + '</text>');
   }
-  // grid x (2 s)
-  for (var tt = 0; tt <= 12; tt += 2) {
+  // grid x (5 s)
+  for (var tt = 0; tt <= 30; tt += 5) {
     var x = tToX(tt).toFixed(1);
     out.push('<line x1="' + x + '" y1="12" x2="' + x + '" y2="226" stroke="#F0F1EC" stroke-width="1"/>');
     out.push('<text x="' + x + '" y="240" text-anchor="middle" font-size="10.5" font-family="JetBrains Mono,monospace" fill="#4A5568">' + tt + 's</text>');
@@ -840,7 +982,7 @@ function renderFreq(p, run, t) {
   // kurva f(t)
   var pts = [];
   for (var i = 0; i < run.fs.length; i++) {
-    if (run.ts[i] > 12) break;
+    if (run.ts[i] > 30) break;
     pts.push(tToX(run.ts[i]).toFixed(1) + ',' + fToY(run.fs[i]).toFixed(1));
   }
   out.push('<polyline points="' + pts.join(' ') + '" fill="none" stroke="#1F4E8C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>');
@@ -858,7 +1000,7 @@ function renderFreq(p, run, t) {
   });
   // nilai f di playhead
   var fNow = fAt(run, t);
-  var xp = Math.min(tToX(Math.min(t, 12)).toFixed(1), 666);
+  var xp = Math.min(tToX(Math.min(t, 30)).toFixed(1), 666);
   out.push('<line x1="' + xp + '" x2="' + xp + '" y1="12" y2="226" stroke="#1F4E8C" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>');
   out.push('<text x="' + xp + '" y="238" text-anchor="middle" font-size="10.5" font-family="JetBrains Mono,monospace" fill="#1F4E8C">' + fNow.toFixed(2) + '</text>');
   return out.join('\n');
@@ -899,7 +1041,7 @@ function renderVolt(run) {
     out.push('<line x1="38" y1="' + yv + '" x2="666" y2="' + yv + '" stroke="#E9EBE6" stroke-width="1"/>');
     out.push('<text x="32" y="' + (parseFloat(yv) + 4).toFixed(1) + '" text-anchor="end" font-size="10.5" font-family="JetBrains Mono,monospace" fill="#4A5568">' + v.toFixed(2) + '</text>');
   }
-  for (var tt = 0; tt <= 12; tt += 2) {
+  for (var tt = 0; tt <= 30; tt += 5) {
     var x = tToX(tt).toFixed(1);
     out.push('<text x="' + x + '" y="184" text-anchor="middle" font-size="10.5" font-family="JetBrains Mono,monospace" fill="#4A5568">' + tt + 's</text>');
   }
@@ -908,7 +1050,7 @@ function renderVolt(run) {
   out.push('<text x="670" y="168" text-anchor="end" font-size="10" font-family="JetBrains Mono,monospace" fill="#C0392B">lantai 0.85</text>');
   var pts = [];
   for (var i = 0; i < run.vs.length; i++) {
-    if (run.ts[i] > 12) break;
+    if (run.ts[i] > 30) break;
     var xv = tToX(run.ts[i]).toFixed(1);
     var yv2 = (12 + (1.05 - run.vs[i]) / 0.2 * 152).toFixed(1);
     pts.push(xv + ',' + yv2);
@@ -1005,8 +1147,28 @@ function renderSide(p, run, t, tab) {
   h += row('Beban sistem', Math.round(loadNow) + ' MW');
   h += row('Pembangkitan', Math.round(gov.sup) + ' MW');
   h += row('Dukungan governor', '+' + Math.round(gov.gov) + ' MW');
+  // AGC sekunder (plan-03 P3 / ADR-0006): total setpoint kumulatif sampai playhead
+  var agcStepsDone = [], agcDisp = 0;
+  if (run && run.agcSteps) {
+    agcStepsDone = run.agcSteps.filter(function (s) { return s.t <= t + 1e-9; });
+    agcDisp = agcStepsDone.reduce(function (a, s) { return a + s.mw; }, 0);
+  }
+  h += row('Dukungan AGC', (agcDisp > 0 ? '+' : '') + Math.round(agcDisp) + ' MW');
   h += row('Headroom tersisa', Math.round(gov.head) + ' MW');
   h += row('Defisit', (deficit <= 0 ? '' : '+') + deficit.toFixed(1) + ' MW');
+  // indikator fase kendali: GOVERNOR → AGC → UFLS, yang aktif ditebalkan
+  var lastAgc = agcStepsDone.length ? agcStepsDone[agcStepsDone.length - 1].t : -1;
+  var lastTrip = trips.length ? trips[trips.length - 1].t : -1;
+  var phase = 'idle';
+  if (collapse || (status === 'PELEPASAN BEBAN' && lastTrip >= lastAgc)) phase = 'ufls';
+  else if (lastAgc >= 0 && lastAgc >= lastTrip) phase = 'agc';
+  else if (lastTrip >= 0 && lastTrip > lastAgc) phase = 'ufls';
+  else if (!trips.length && Math.abs(f - 50) > 1e-9) phase = 'governor';
+  var phCls = function (k) { return k === phase ? ' ph-on' : ''; };
+  h += '<div class="phase"><span class="phlbl">fase</span>'
+    + '<span class="ph' + phCls('governor') + '">GOVERNOR</span><i>→</i>'
+    + '<span class="ph' + phCls('agc') + '">AGC</span><i>→</i>'
+    + '<span class="ph' + phCls('ufls') + '">UFLS</span></div>';
   return h;
 }
 
@@ -1063,6 +1225,17 @@ function renderScenGroup() {
   });
   el.innerHTML = h;
 }
+function renderAgcCtl() {
+  // toggle AGC sekunder (plan-03 P3) — kontainer #agcGroup statis, isi dibangun ulang
+  var el = document.getElementById('agcGroup');
+  if (!el) return;
+  var h = '';
+  [[1, 'ON'], [0, 'OFF']].forEach(function (kv) {
+    var active = (kv[0] === 1) === (S.param.agcOn !== false);
+    h += '<button class="' + (active ? 'active' : '') + '" data-agc="' + kv[0] + '">' + kv[1] + '</button>';
+  });
+  el.innerHTML = h;
+}
 
 /* ═══════════════ 15. render() master ═══════════════ */
 function renderSldInto() {
@@ -1089,6 +1262,7 @@ function render() {
   renderGenList();
   renderStageList();
   renderScenGroup();
+  renderAgcCtl();
   renderSldInto();
   renderCharts();
   renderSideInto();
@@ -1096,6 +1270,18 @@ function render() {
 
 /* ═══════════════ 16. Binding kontrol ═══════════════ */
 function el(id) { return document.getElementById(id); }
+function applyPreset(id) {
+  // plan-03 P0: satu titik ubah preset — param + elemen DOM (select, slider, label)
+  var pr = PRESETS[id] || PRESETS.mandiri;
+  S.param.presetId = (pr === PRESETS.mandiri) ? 'mandiri' : id;
+  S.param.gens = clone(pr.gens);
+  S.param.loadMw = pr.loadMw;
+  S.param.importMw = pr.importMw;
+  var sel = el('presetSel'); if (sel) sel.value = S.param.presetId;
+  var impS = el('impSlider'); if (impS) impS.value = String(pr.importMw);
+  var iv = el('impV'); if (iv) iv.textContent = pr.importMw + ' MW';
+  var lv = el('loadV'); if (lv) lv.textContent = pr.loadMw + ' MW';
+}
 function bind() {
   // collapse kartu kiri
   var cards = document.querySelectorAll('.card[data-card]');
@@ -1132,15 +1318,22 @@ function bind() {
     if (!b) return;
     var sc = null;
     SCENARIOS.forEach(function (x) { if (x.id === b.dataset.scen) sc = x; });
+    // plan-03 P0: skenario 'Lepas interkoneksi' butuh sistem berimpor — kalau preset
+    // masih mandiri, paksa ganti ke berimpor agar skenario selalu punya efek.
+    if (sc && sc.kind === 'importLoss' && S.param.presetId !== 'berimpor') applyPreset('berimpor');
     S.param.scenario = clone(sc || { kind: 'none' });
     S.ui.playing = false; S.ui.tNow = 0; computeRun(); render();
+    play(); // auto-play (plan-03 P0 §0b): klik skenario → langsung jalan
+  });
+  // delegasi toggle AGC (kontainer #agcGroup statis — tombol dibangun ulang di render)
+  var ag = el('agcGroup');
+  if (ag) ag.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest ? e.target.closest('button[data-agc]') : null;
+    if (!b) return;
+    setAgc(b.dataset.agc === '1');
   });
   if (el('presetSel')) el('presetSel').addEventListener('change', function (e) {
-    var pr = PRESETS[e.target.value] || PRESETS.mandiri;
-    S.param.presetId = e.target.value;
-    S.param.gens = clone(pr.gens);
-    S.param.loadMw = pr.loadMw;
-    S.param.importMw = pr.importMw;
+    applyPreset(e.target.value);
     S.ui.playing = false; S.ui.tNow = 0; computeRun(); render();
   });
   if (el('impSlider')) el('impSlider').addEventListener('input', function (e) {
@@ -1184,7 +1377,7 @@ function qTipOut(e) {
 }
 
 /* ── collapse (seam anti-blink: centering via padding-top, bukan justify-content) ── */
-var CARD_ORDER = ['unit', 'beban', 'skenario', 'tentang'];
+var CARD_ORDER = ['unit', 'beban', 'kendali', 'skenario', 'tentang'];
 function toggleCard(name) {
   S.ui.collapsed[name] = !S.ui.collapsed[name];
   syncCollapseDom(); syncCollapsedCentering();
@@ -1249,24 +1442,43 @@ function setSideTab(tab) {
   renderSideInto();
 }
 
-/* ── main loop playback (rAF; 1 langkah = 0.05 s eng @1×) ── */
+/* ── main loop playback — waktu DINDING + throttle render (plan-03 P0) ──
+   dt = clamp(ΔrAF, 0, 0,1) × speed → 1× = real-time (bukan 0,05 s/frame).
+   Tiap frame: SLD (chip MW/RPM live) + transport/playhead. Render berat
+   (grafik f/V + kartu kanan) di-throttle ke ~10 fps saat play. */
+function play() {
+  S.ui.playing = true;
+  S.ui.lastT = null; // frame pertama tick memakai delta sejak rAF pertama
+  requestAnimationFrame(tick);
+  renderTransport();
+}
 function togglePlay() {
   if (!S.run) computeRun();
   if (S.run && S.ui.tNow >= S.run.tMax - 1e-9) S.ui.tNow = 0;
-  S.ui.playing = !S.ui.playing;
-  if (S.ui.playing) requestAnimationFrame(tick);
+  if (!S.ui.playing) { play(); return; }
+  S.ui.playing = false;
+  renderCharts(); renderSideInto(); // flush frame terakhir yang ter-throttle
   renderTransport();
 }
-function tick() {
+function tick(now) {
   if (!S.ui.playing) return;
-  var step = 0.05 * S.ui.speed;
-  S.ui.tNow += step;
   var r = S.run;
+  var nowMs = (typeof now === 'number' && now > 0) ? now
+    : (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+  if (!(S.ui.lastT > 0)) S.ui.lastT = nowMs;
+  var dt = Math.min(Math.max((nowMs - S.ui.lastT) / 1000, 0), 0.1) * S.ui.speed;
+  S.ui.lastT = nowMs;
+  S.ui.tNow += dt;
   if (r && S.ui.tNow >= r.tMax) { S.ui.tNow = r.tMax; S.ui.playing = false; }
+  // ringan tiap frame: SLD (chip MW naik saat governor/AGC) + transport (t/f)
   renderSldInto();
-  renderCharts();
-  renderSideInto();
   renderTransport();
+  // berat ~10 fps: grafik f/V + kartu kanan (jeda penuh saat stop biar tak basi)
+  if (nowMs - S.ui.lastHeavy >= 100 || !S.ui.playing) {
+    S.ui.lastHeavy = nowMs; S.ui.heavyN++;
+    renderCharts();
+    renderSideInto();
+  }
   if (S.ui.playing) requestAnimationFrame(tick);
 }
 
@@ -1313,6 +1525,13 @@ if (typeof ResizeObserver !== 'undefined') {
 }
 setTimeout(fitSld, 350);
 
+/* toggle AGC sekunder dari UI/tes (plan-03 P3) — recompute run penuh */
+function setAgc(on) {
+  S.param.agcOn = !!on;
+  renderAgcCtl();
+  S.ui.playing = false; S.ui.tNow = 0; computeRun(); render();
+}
+
 /* ═══════════════ 17. Registry ekspor (satu-sumber-kebenaran utk tes) ═══════════════ */
 var API = {
   render: render,
@@ -1324,6 +1543,8 @@ var API = {
   renderGauge: renderGauge,
   renderVolt: renderVolt,
   renderCharts: renderCharts,
+  renderAgcCtl: renderAgcCtl,
+  setAgc: setAgc,
   fToY: fToY,
   tToX: tToX,
   renderTransport: renderTransport,
@@ -1360,6 +1581,7 @@ var API = {
 
 /* inisialisasi */
 computeRun();
+applyPreset(S.param.presetId); // sinkronkan select/slider/label ke param (plan-03 P0)
 bind();
 syncCollapseDom();
 syncViewDom();

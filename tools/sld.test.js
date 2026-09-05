@@ -136,5 +136,37 @@ check('fAt: interpolasi linier antar sampel', () => {
   if (Math.abs(A.fAt(run, 5) - 48) > 1e-9) throw new Error('t di luar jangkauan = sampel akhir');
 });
 
+/* ── plan-03 P3: label AGC di chip SLD saat setpoint sekunder aktif ── */
+const agcP = scenP('loadStep', { mw: 200 });
+const agcRun = runOf(agcP);
+check('plan-03: chip "AGC" muncul di SEMUA unit online SETELAH langkah AGC (+200, t=pasca langkah 1)', () => {
+  const t1 = agcRun.agcSteps[0].t;
+  const s = renderAt(agcP, agcRun, t1 + 0.05);
+  const tags = count(s, 'class="agctag"');
+  if (tags !== 3) throw new Error('ketiga unit menerima setpoint AGC → 3 label agctag, dapat ' + tags);
+  if (!s.includes('>AGC<')) throw new Error('teks label AGC harus ada');
+});
+check('plan-03: tanpa AGC (agcOn=false) atau sebelum langkah → tanpa label agcctag', () => {
+  const s0 = renderAt(agcP, agcRun, 0);
+  if (count(s0, 'class="agctag"') !== 0) throw new Error('t=0 belum boleh ada label AGC');
+  const pOff = scenP('loadStep', { mw: 200 });
+  pOff.agcOn = false;
+  const runOff = runOf(pOff);
+  const sOff = renderAt(pOff, runOff, runOff.tMax);
+  if (count(sOff, 'class="agctag"') !== 0) throw new Error('agcOn=false tidak boleh ada label AGC');
+});
+check('plan-03: MW chip = droop + setpoint AGC, tidak pernah melewati govMax', () => {
+  const t1 = agcRun.agcSteps[0].t;
+  const s = renderAt(agcP, agcRun, t1 + 0.05);
+  const re = /class="chipmw"[^>]*>([0-9]+) MW(?: · maks gov)?</g;
+  const vals = [];
+  let mm;
+  while ((mm = re.exec(s))) vals.push(parseInt(mm[1], 10));
+  if (vals.length < 3) throw new Error('harus ada 3 chip MW, dapat ' + vals.length);
+  const g2 = agcP.gens.find(g => g.id === 'G2');
+  if (vals[1] <= g2.p0) throw new Error('MW G2 harus naik karena AGC/droop, dapat ' + vals[1]);
+  if (vals[1] > g2.govMax) throw new Error('MW G2 tidak boleh melewati govMax ' + g2.govMax + ', dapat ' + vals[1]);
+});
+
 console.log(`\n${passed} lulus, ${failed} gagal`);
 process.exit(failed ? 1 : 0);
