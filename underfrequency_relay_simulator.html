@@ -76,11 +76,11 @@
   *::-webkit-scrollbar-track{background:transparent;}
   *::-webkit-scrollbar-thumb{background:var(--line);border-radius:10px;}
   *::-webkit-scrollbar-thumb:hover{background:var(--blue-soft);}
-  .params-panel{display:flex;flex-direction:column;gap:14px;overflow-y:auto;scrollbar-gutter:stable;padding:2px 3px 14px 0;transition:padding-top .35s ease;}
+  .params-panel{display:flex;flex-direction:column;gap:14px;overflow-y:auto;scrollbar-gutter:stable;padding:2px 3px 14px 0;}
   .params-panel .card{margin-bottom:0;}
   @media(max-width:900px){.params-panel{height:auto!important;overflow:visible;scrollbar-gutter:auto;}}
-  /* pusat tumpukan saat semua ciut DIATUR via padding-top inline (animatable) —
-     jangan justify-content: tidak animatable → blink tengah→atas (seam anti-blink). */
+  /* Kartu ciut mepet ke atas (flex-start) — TANPA centering vertikal saat semua
+     ciut (seam: jangan justify-content / padding-top inline → tumpukan mengambang). */
 
   .field{margin-bottom:11px;}
   .field:last-child{margin-bottom:0;}
@@ -1527,44 +1527,20 @@ function qTipOut(e) {
   if (tip) tip.className = '';
 }
 
-/* ── collapse (seam anti-blink: centering via padding-top, bukan justify-content) ── */
+/* ── collapse (kartu ciut mepet ke atas; TANPA centering vertikal saat semua ciut) ── */
 var CARD_ORDER = ['unit', 'beban', 'kendali', 'skenario', 'tentang'];
 function toggleCard(name) {
   S.ui.collapsed[name] = !S.ui.collapsed[name];
-  syncCollapseDom(); syncCollapsedCentering();
+  syncCollapseDom();
 }
 function setAllCollapsed(v) {
   CARD_ORDER.forEach(function (n) { S.ui.collapsed[n] = v; });
-  syncCollapseDom(); syncCollapsedCentering();
+  syncCollapseDom();
 }
 function syncCollapseDom() {
   var cards = document.querySelectorAll('.card[data-card]');
   for (var i = 0; i < cards.length; i++) {
     cards[i].classList.toggle('collapsed', !!S.ui.collapsed[cards[i].dataset.card]);
-  }
-}
-function collapsedStackH() {
-  var cards = document.querySelectorAll('.card[data-card]');
-  var sum = 0;
-  for (var i = 0; i < cards.length; i++) {
-    var hEl = cards[i].querySelector('.card-h');
-    var h = hEl && hEl.getBoundingClientRect ? hEl.getBoundingClientRect().height : 0;
-    if (!(h > 0)) h = 34;
-    sum += h;
-  }
-  return sum;
-}
-function syncCollapsedCentering() {
-  var panel = el('paramsPanel');
-  if (!panel) return;
-  var all = CARD_ORDER.every(function (n) { return S.ui.collapsed[n]; });
-  panel.classList.toggle('all-collapsed', all);
-  if (all) {
-    var ph = panel.getBoundingClientRect ? panel.getBoundingClientRect().height : 0;
-    var pad = Math.max(0, (ph - collapsedStackH()) / 2 - 16);
-    panel.style.paddingTop = pad + 'px';
-  } else {
-    panel.style.paddingTop = '';
   }
 }
 
@@ -1734,8 +1710,6 @@ var API = {
   sim: sim,
   toggleCard: toggleCard,
   setAllCollapsed: setAllCollapsed,
-  syncCollapsedCentering: syncCollapsedCentering,
-  collapsedStackH: collapsedStackH,
   setSideTab: setSideTab,
   snapshot: snapshot,
   setView: setView,

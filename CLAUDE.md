@@ -50,6 +50,12 @@ langsung di browser atau `python -m http.server`.
   border bersilang); diperbaiki → kotak **96 lebar** (celah 9 px; strip 72–588 sejajar
   bus 70–590). Tes M9 baru di sld.test (24 asersi). Log:
   `design-plans/sesi-2026-09-05-05-…`.
+- **M13 (2026-09-05, ciut-semua mepet ke atas)**: kartu param yang diciutkan semua
+  tadinya **dipusatkan vertikal** via `padding-top` inline (`syncCollapsedCentering`
+  + `collapsedStackH`, seam anti-blink) → tumpukan mengambang di tengah kolom yang
+  tinggi; kini **mepet ke atas** (flex-start) — mesin centering + kelas `all-collapsed`
+  + CSS transition `padding-top` dihapus; ui.test 34 asersi tetap (2 seam ditulis
+  ulang). Log: `design-plans/sesi-2026-09-05-14-…`.
 - **M10 (2026-09-05, grafik mengisi kolom)**: kartu grafik flex bertumpuk mengisi
   **penuh tinggi kolom tengah** (sebelumnya void ±190–230 px @layar tinggi). Renderer
   grafik kini menerima **dims `{w,h}`** (ukur `clientWidth/Height` → `viewBox`
@@ -184,9 +190,9 @@ jangan diedit tanpa izin. Bila ragu proyek mana yang dimaksud user: tanyakan.
   (20/1350/1860 ms, klik=skip, `prefers-reduced-motion`=skip langsung).
 - **Jangan regresi**: splash krem (#FDFAF3→#F8EFE1) dengan huruf S H E V A; judul
   bergantian `.tt-a` ↔ `.tt-b` (kilau `ttShine`, copper lembut #8A6B4D); kartu
-  collapse `.card-b-i` (grid 1fr→0fr, BUKAN `display:none`); centering semua-ciut
-  via `padding-top` inline (`syncCollapsedCentering` + `collapsedStackH`) — jangan
-  `justify-content:center` (tidak animatable → blink); scrollbar tipis global;
+  collapse `.card-b-i` (grid 1fr→0fr, BUKAN `display:none`); kartu ciut mepet ke
+  atas (flex-start) — TANPA centering vertikal saat semua ciut (seam: jangan
+  `justify-content:center`/`padding-top` inline → tumpukan mengambang); scrollbar tipis global;
   tooltip `#qTip` untuk ikon `?` (`span.q[data-tip]`, delegasi `pointerover/out`,
   JANGAN pakai attr `hidden` — CSS `display` menimpanya).
 - Status warna semantik: hijau = normal/online/pemulihan, copper/amber = defisit/

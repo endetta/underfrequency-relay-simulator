@@ -43,11 +43,11 @@ check('collapse animasi .card-b-i grid 1fr→0fr (bukan display:none) + chev', (
   contains(src, '.card.collapsed .chev{transform:rotate(-90deg);}', 'chev');
   if (src.includes('.card.collapsed .card-b{display:none}')) throw new Error('display:none tidak diizinkan');
 });
-check('collapse centering DIANIMASI via padding-top + collapsedStackH (anti-blink)', () => {
+check('collapse semua-ciut: TANPA centering — tumpukan mepet ke atas (tanpa paddingTop/all-collapsed)', () => {
   if (src.includes('.all-collapsed{justify-content:center}')) throw new Error('centering justify-content → blink');
-  contains(src, 'collapsedStackH', 'ukuran tinggi ciut');
-  contains(src, 'transition:padding-top .35s ease', 'padding animatable');
-  contains(src, "panel.classList.toggle('all-collapsed', all)", 'kelas centering');
+  if (src.includes('collapsedStackH')) throw new Error('collapsedStackH harus dihapus (tak ada centering)');
+  if (src.includes('all-collapsed')) throw new Error('kelas all-collapsed harus dihapus (tak ada centering)');
+  if (/syncCollapsedCentering/.test(src)) throw new Error('syncCollapsedCentering harus dihapus (tak ada centering)');
 });
 check('scrollbar tipis global', () => {
   contains(src, 'scrollbar-width:thin', 'firefox');
@@ -113,19 +113,18 @@ check('tidak ada KaTeX & tidak ada kartu ringkasan dot (kartu kanan = tab)', () 
   if (src.toLowerCase().includes('katex')) throw new Error('KaTeX dilarang (inline SVG saja)');
   if (src.includes('dot-summary')) throw new Error('kartu ringkasan lama tidak dipakai');
 });
-check('collapse: S.ui.collapsed 5 kartu (unit/beban/kendali/skenario/tentang); all-collapsed → paddingTop set; expand → kosong', () => {
+check('collapse: S.ui.collapsed 5 kartu; semua-ciut → TANPA paddingTop (mepet ke atas); expand → tetap kosong', () => {
   const keys = Object.keys(A.S.ui.collapsed).sort();
   if (JSON.stringify(keys) !== JSON.stringify(['beban', 'kendali', 'skenario', 'tentang', 'unit'])) {
     throw new Error('kartu collapse harus 5: ' + JSON.stringify(keys));
   }
   A.setAllCollapsed(true);
   if (!A.S.ui.collapsed.unit || !A.S.ui.collapsed.beban) throw new Error('harus semua ciut');
-  const panel = ctx.els.paramsPanel;
-  if (!panel.classList.contains('all-collapsed')) throw new Error('paramsPanel harus all-collapsed');
-  if (!(parseFloat(panel.style.paddingTop) > 0)) throw new Error('paddingTop harus angka positif');
+  const panel = global.document.getElementById('paramsPanel');
+  if (!panel) throw new Error('paramsPanel harus ada');
+  if (panel.style.paddingTop) throw new Error('paddingTop harus kosong (mepet ke atas)');
   A.setAllCollapsed(false);
-  if (panel.classList.contains('all-collapsed')) throw new Error('all-collapsed harus dilepas');
-  if (panel.style.paddingTop !== '') throw new Error('paddingTop harus kosong');
+  if (panel.style.paddingTop) throw new Error('paddingTop harus kosong');
   A.toggleCard('unit');
   if (!A.S.ui.collapsed.unit) throw new Error('toggleCard harus membalik unit');
   A.toggleCard('unit');
