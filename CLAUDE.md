@@ -25,6 +25,16 @@ langsung di browser atau `python -m http.server`.
   kart-dalam-kart. Eksekusi & plan di `design-plans/plan-02-…`; log sesi di
   `design-plans/sesi-2026-09-05-01-…`.
 
+## Log sesi & sinkronisasi dokumen (WAJIB — aturan root poin 8)
+
+- Tiap perubahan non-sepele dicatat di `design-plans/sesi-YYYY-MM-DD-NN-*.md`
+  (template `design-plans/sesi-TEMPLATE.md`): waktu mulai + commit sebelum → kegiatan
+  & hasil (ringkas, dgn bukti tes/angka) → status → langkah berikutnya. Perbarui juga
+  status header `design-plans/plan-*.md` yang dipakai (DRAF → DIEKSEKUSI → SELESAI).
+- Riwayat terbaru: `sesi-2026-09-05-01` (audit improve-ui → eksekusi M5, plan-02 SELESAI).
+- **Sesi/AI baru mulai dari:** file ini → log sesi terbaru → plan ber-status DRAF/BELUM
+  → kerjakan lanjutannya. Riwayat & arah tersimpan di file — jangan eksplorasi ulang.
+
 ## Pintu masuk
 
 | File | Peran |
@@ -32,6 +42,7 @@ langsung di browser atau `python -m http.server`.
 | `underfrequency_relay_simulator.html` | Produk satu-file (script: §1–11 mesin murni, §12+ state/UI/renderer) |
 | `docs/PRD.md` | Sumber kebenaran MODEL (persamaan §5) + keputusan prototipe §7 |
 | `docs/implementation-plan.md` | Kontrak implementasi + spesifikasi UI §5 |
+| `design-plans/` | Plan (status DRAF/DIEKSEKUSI/SELESAI) + log sesi (`sesi-*.md`) + `sesi-TEMPLATE.md` |
 | `tools/lens-harness.js` | Stub DOM untuk menjalankan `<script>` di Node |
 | `tools/*.test.js` | 5 suite tes Node (lihat bawah) |
 | `tools/shoot.js` | Screenshot headless Chrome (CDP, tanpa dependensi) |
@@ -62,22 +73,17 @@ langsung di browser atau `python -m http.server`.
 - Bahasa UI/dokumen/pesan commit = **Indonesia**; istilah proteksi tak diterjemahkan.
   Pesan commit conventional (feat:/fix:/docs:).
 
-## Model (ringkas — PRD §5 & U01 §7–8)
+## Model — persamaan di sumbernya, bukan di sini
 
-- Agregat online: `S_base`, `H_sys`, `P_gen0`, `β = Σ MVA/R`, `reserve`.
-- Droop: `resp_i = max(0, −Δf/50 · MVA_i/R_i)` dijepit headroom; saturasi saat
-  `Δf ≤ Δf_i,sat = −50·headroom·R/MVA`.
-- ROCOF awal: `−(50/(2·H_sys))·(D₀/S_base)`.
-- Solver piecewise (`solveSteadyState`): saturasi berurutan → `SETTLED`/`COLLAPSE`
-  (β→0 & defisit tak ter-cover). D=290 SETTLED / D=291 COLLAPSE (default).
-- Timeline (`ufTimeline`): integrasi segmen bentuk-tertutup
-  `Δf(t+Δt) = Δf_ss + (Δf−Δf_ss)·e^(−K·Δt)`, event-driven (unit jenuh, trip UFLS,
-  lantai 47 Hz), **deterministik**, parity statis↔timeline < 1e-6 (U01 §13.1).
-- UFLS strict: arm `f < ambang && !nearlyEqual`; timer reset bila f naik; trip saat
-  timer ≥ tunda → **MW nyata feeder** (fraksi × beban pra-gangguan), **latch**.
-- Tegangan: ilustratif (ADR-0004) — lekukan `min(0,15, 0,5·D₀/S)`, τ 0,2/3 s,
-  lantai 0,85; label "ilustratif — bukan hasil aliran daya" WAJIB.
-- RPM unit: `n = 120·f/kutub` (2 kutub @50 Hz = 3000).
+- Persamaan lengkap: **`docs/PRD.md` §5** (rantai) + spesifikasi **U01 §7–8** (LEVEL 3,
+  baca-saja) — engine memakai persis itu (tes literal U01 §12). JANGAN duplikasi di sini.
+- Gotcha yang sering menggigit (tidak di PRD):
+  - `pct` tahap UFLS = **fraksi** (0,05), bukan persen.
+  - RPM unit `n = 120·f/kutub` (2 kutub @50 Hz = 3000).
+  - UFLS strict: arm `f < ambang` (bukan ≤); trip = MW nyata feeder; **latch**.
+  - Saturasi governor: D=290 SETTLED / D=291 COLLAPSE (default) — batas eksak teruji.
+  - `ufTimeline` deterministik; parity statis↔timeline < 1e-6 (U01 §13.1).
+  - V ilustratif (ADR-0004): lantai 0,85; label "ilustratif — bukan hasil aliran daya" WAJIB.
 
 ## Tes & validasi
 

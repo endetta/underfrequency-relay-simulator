@@ -50,6 +50,18 @@
   ttg "menu yang bisa dibuka/diciutkan di tengah").
 - Plan-02 diperbarui: §0 poin 6–8, §4.1 (padding params), §4.4b (gauge), §5.3 (literal tes gauge).
 
+## 4c. Perubahan dokumentasi CLAUDE.md (skill claude-md-improver, lanjutan sesi sama)
+
+- Skill `claude-md-improver` dijalankan atas permintaan user: hemat token + aturan log sesi wajib.
+- Root `CLAUDE.md` (bukan repo): peta proyek + validasi ditambah proyek underfrequency (currency),
+  aturan baru poin 8 "Log sesi wajib", trim paragraf riwayat nama folder.
+- `CLAUDE.md` proyek: section baru "Log sesi & sinkronisasi dokumen (WAJIB)", bagian model
+  di-ringkas (duplikasi persamaan PRD §5 dilepas → pointer ke PRD/U01 + gotcha saja), tabel pintu
+  masuk + baris `design-plans/`.
+- Baru: `design-plans/sesi-TEMPLATE.md` (template log 7 bidang: waktu+commit sebelum → mandat →
+  kegiatan+hasil+bukti → dokumen tersinkron → status → langkah berikutnya).
+- Repo di-commit: `CLAUDE.md` + `sesi-TEMPLATE.md` (lihat riwayat git).
+
 ## 5. Status sekarang & apa yang dilakukan sesi berikutnya
 
 - **Status: SELESAI (lanjutan sesi yang sama).** Plan-02 disetujui user (setelah gambaran layout +
