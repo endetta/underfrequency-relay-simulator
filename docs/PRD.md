@@ -125,7 +125,7 @@ biasa dengan kartu menumpuk (collapse `.card-b-i`).
   kartu kanan = nilai langsung).
 
 ### 4.4 Grafik & indikator
-- **Grafik frekuensi**: x = waktu engineering (s, jendela 0–20 s default), y = 47–52 Hz;
+- **Grafik frekuensi**: x = waktu engineering (s, jendela 0–30 s — §7 item 3 / ADR-0006), y = 47–52 Hz;
   kurva `f(t)`; **garis panduan putus-putus** di 49,5/49,0/48,5/48,0 berlabel tahap;
   penanda peristiwa; penanda trip tahap bila perlu. Pita normal 50 ±0,2 Hz diberi
   latar hijau lembut.

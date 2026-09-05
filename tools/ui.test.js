@@ -291,5 +291,31 @@ check('P3: AGC OFF → tanpa langkah; side Dukungan AGC 0 MW & fase GOVERNOR saa
   if (h.indexOf('ph-on">GOVERNOR<') === -1) throw new Error('tanpa AGC, fase governor harus aktif saat defisit');
 });
 
+/* ===== temuan code-review: skenario lengkap PRD §4.2/§5.10 (G2, Blok G3, beban [MW]) ===== */
+check('review: 8 chip skenario (Lepas G2 & Blok G3 & + Beban [MW]) + input beban', () => {
+  contains(src, 'Lepas G2', 'skenario G2');
+  contains(src, 'Blok G3', 'skenario blok');
+  contains(src, 'id="loadStepSlider"', 'input beban [MW]');
+  contains(src, 'id="loadStepV"', 'nilai beban');
+  A.render();
+  const n = (ctx.els.scenGroup.innerHTML.match(/class="scen/g) || []).length;
+  if (n !== 8) throw new Error('harus 8 chip skenario, dapat ' + n);
+});
+check('review: beban [MW] mengubah chip label & skenario loadStep (AGC dispatch ikut)', () => {
+  A.S.ui.loadStepMw = 150;
+  A.render();
+  if (!ctx.els.scenGroup.innerHTML.includes('+ Beban 150 MW')) throw new Error('chip harus + Beban 150 MW');
+  A.S.param.scenario = { kind: 'loadStep', mw: A.S.ui.loadStepMw };
+  A.computeRun();
+  const r = A.S.run;
+  if (Math.abs(r.agcDispatch - 150) > 1e-6) {
+    throw new Error('AGC dispatch harus 150 (beban 150 MW), dapat ' + r.agcDispatch);
+  }
+  if (r.status !== 'SEIMBANG') throw new Error('beban 150 harus pulih SEIMBANG, dapat ' + r.status);
+  A.S.ui.loadStepMw = 200;
+  A.S.param.scenario = { kind: 'none' };
+  A.computeRun();
+});
+
 console.log(`\n${passed} lulus, ${failed} gagal`);
 process.exit(failed ? 1 : 0);

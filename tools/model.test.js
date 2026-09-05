@@ -222,6 +222,27 @@ check('statis +Beban besar → COLLAPSE (D 1000 > headroom 290 + shed 550), stea
   if (r.operated.length !== 4) throw new Error('semua tahap dilepas');
 });
 
+/* ── §5.3 GENERATOR_BLOCK (temuan code-review: output dijepit ke govMax) ── */
+check('applyScenario Blok G3 (maks 100): govMax 100 & output DIJEPIT ke 100 (PRD §5.3)', () => {
+  const gens = JSON.parse(JSON.stringify(G));
+  const ap = A.applyScenario(gens, 1100, 0, { kind: 'block', target: 'G3', mw: 100 });
+  if (gens[2].govMax !== 100 || gens[2].p0 !== 100) {
+    throw new Error('G3 harus govMax 100 & p0 100: ' + JSON.stringify(gens[2]));
+  }
+  if (ap.load !== 1100 || ap.imp !== 0) throw new Error('load/imp tak boleh berubah');
+  if (ap.txt.indexOf('blok G3') === -1) throw new Error('txt harus blok G3: ' + ap.txt);
+  // unit lain tak tersentuh
+  if (gens[0].p0 !== 500 || gens[1].govMax !== 430) throw new Error('G1/G2 tak boleh berubah');
+});
+check('statis Blok G3 (maks 100): defisit 150, f_ss 49.70297, tanpa shed', () => {
+  const r = ufEvaluateStatic(P({ scenario: { kind: 'block', target: 'G3', mw: 100 } }));
+  if (r.status !== 'SETTLED') throw new Error('harus SETTLED: ' + JSON.stringify(r));
+  approx(r.steadyStateHz, 50 - 7500 / 25250, 1e-9, 'f_ss'); // β G1+G2 = 25250
+  approx(r.initialDeficitMw, 150, 1e-9, 'D0');
+  approx(r.initialRocofHzPerSec, -0.55270, 1e-3, 'rocof');
+  if (r.totalShed !== 0 || r.operated.length) throw new Error('tanpa shed');
+});
+
 /* render default (M0: kosong) harus jalan tanpa error */
 check('render() default jalan (tanpa error)', () => { A.render(); });
 

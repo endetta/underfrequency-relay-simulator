@@ -59,10 +59,10 @@ check('baseline: interkoneksi 400 MW berlabel, beban 1100 MW, vital teal tersamb
   if (!s.includes('Beban 1100 MW')) throw new Error('label beban harus 1100 MW');
   if (!s.includes('VITAL · 550 MW')) throw new Error('label vital harus VITAL · 550 MW');
   // garis vital (teal) harus benar-benar menempel ke bus: segmen dari bus ke atas (plan-02 §4.3)
-  if (!s.includes('x1="540" y1="72" x2="540" y2="252" stroke="#13697A"')) {
-    throw new Error('feeder vital harus tersambung solid ke bus dengan warna teal');
+  if (!s.includes('x1="540" y1="72" x2="540" y2="252" stroke="var(--teal)"')) {
+    throw new Error('feeder vital harus tersambung solid ke bus dengan warna teal (var(--teal))');
   }
-  if (count(s, 'stroke="#13697A"') < 2) throw new Error('vital harus bergaris teal');
+  if (count(s, 'stroke="var(--teal)"') < 2) throw new Error('vital harus bergaris teal');
 });
 check('baseline: semua generator ONLINE (chip hijau, RPM 3000/1500), tanpa maks gov', () => {
   const s = renderAt(baseP, baseRun, 0);
@@ -105,13 +105,32 @@ check('lepas G1 (akhir run): keempat tahap terbuka berurutan, impor tetap tersam
 check('lepas G1: chip G1 TRIP (abu) + 0 MW; G2/G3 online; beban akhir 550 MW · lepas 550', () => {
   const s = renderAt(g1P, g1Run, T_END);
   if (count(s, 'TRIP') !== 1) throw new Error('tepat G1 yang TRIP');
-  if (!s.includes('stroke="#C9CDD2"')) throw new Error('simbol G1 harus abu (offline)');
+  if (!s.includes('stroke="var(--off)"')) throw new Error('simbol G1 harus abu (offline)');
   if (!s.includes('Beban 550 MW · lepas 550')) throw new Error('beban akhir 550 MW dgn total lepas 550');
   if (count(s, 'RPM ') !== 2) throw new Error('hanya G2/G3 yang menampilkan RPM');
 });
 check('lepas G1: tanpa dasharray di semua keadaan', () => {
   const s = renderAt(g1P, g1Run, T_END);
   if (s.includes('stroke-dasharray')) throw new Error('dilarang stroke-dasharray');
+});
+
+/* ── skenario Lepas G2 & Blok G3 (temuan code-review: PRD §4.2/§5.10) ── */
+const g2P = scenP('genLoss', { target: 'G2' });
+const g2Run = runOf(g2P);
+check('Lepas G2: chip G2 TRIP (abu) + 0 MW; G1/G3 online; tanpa dasharray', () => {
+  const s = renderAt(g2P, g2Run, g2Run.tMax);
+  if (count(s, 'TRIP') !== 1) throw new Error('tepat G2 yang TRIP, dapat ' + count(s, 'TRIP'));
+  if (!s.includes('stroke="var(--off)"')) throw new Error('simbol G2 harus abu (offline)');
+  if (count(s, 'RPM ') !== 2) throw new Error('hanya G1/G3 yang menampilkan RPM');
+  if (s.includes('stroke-dasharray')) throw new Error('tanpa dasharray');
+});
+const blkP = scenP('block', { target: 'G3', mw: 100 });
+const blkRun = runOf(blkP);
+check('Blok G3 (maks 100): chip G3 = 100 MW (output dijepit PRD §5.3), bukan 250', () => {
+  const s = renderAt(blkP, blkRun, blkRun.tMax);
+  const mws = [...s.matchAll(/class="chipmw"[^>]*>([^<]+)</g)].map(m => m[1]);
+  if (mws.length !== 3) throw new Error('harus 3 chip MW, dapat ' + mws.length);
+  if (mws[2] !== '100 MW') throw new Error('chip G3 harus 100 MW (terblok), dapat ' + mws[2]);
 });
 
 /* ── floor tipografi kanvas (plan-02 §4.4) ── */

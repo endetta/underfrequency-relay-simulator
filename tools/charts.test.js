@@ -100,10 +100,10 @@ check('gauge: hijau HANYA di zona 50 Hz — puncak copper (over-frekuensi), dasa
   const s = A.renderGauge(49.5);
   const stops = (s.match(/<stop /g) || []).length;
   if (stops < 5) throw new Error('min 5 stop warna, dapat ' + stops);
-  if (!s.includes('offset="0%"') || !s.includes('#B5651D')) throw new Error('puncak (52 Hz) harus copper, BUKAN hijau');
-  if (/offset="0%"[^>]*#2E7D46/.test(s)) throw new Error('stop 0% tidak boleh hijau');
-  if (!s.includes('offset="100%"') || !s.includes('#C0392B')) throw new Error('dasar (47 Hz) harus merah');
-  if (!s.includes('#2E7D46')) throw new Error('hijau harus ada di zona 50 Hz');
+  if (!s.includes('offset="0%"') || !s.includes('var(--copper)')) throw new Error('puncak (52 Hz) harus copper, BUKAN hijau');
+  if (/offset="0%"[^>]*var\(--green\)/.test(s)) throw new Error('stop 0% tidak boleh hijau');
+  if (!s.includes('offset="100%"') || !s.includes('var(--red)')) throw new Error('dasar (47 Hz) harus merah');
+  if (!s.includes('var(--green)')) throw new Error('hijau harus ada di zona 50 Hz');
 });
 check('gauge: penunjuk f=49.5 di y=119 & nilai tertulis; f=50 → y=97.6', () => {
   const s50 = A.renderGauge(50);

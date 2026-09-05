@@ -357,6 +357,7 @@ async function main() {
     results.push(await capture(cdp, 'mid', setScen('imp', 2.2, 'berimpor')));
     results.push(await capture(cdp, 'runtuh', setScen('runtuh', 5.5)));
     results.push(await capture(cdp, 'g1-end', setScen('g1', 25)));
+    results.push(await capture(cdp, 'blok', setScen('block', 20, 'mandiri'))); // Blok G3 (maks 100 MW) — output dijepit
     results.push(await capture(cdp, 'collapsed', `API.setAllCollapsed(true);`));
     results.push(await capture(cdp, 'view-graf', `API.setAllCollapsed(false); API.setView('graf'); API.render();`));
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: 700, height: 1000, deviceScaleFactor: 1, mobile: false });

@@ -97,7 +97,7 @@ tunda habis; tahap yang trip **terkunci**; dasar fraksi = beban **pra-gangguan**
   label + pemutus); 3 generator simbol lingkaran+salib di bawah bus, chip RPM+MW
   (hijau online / copper maks-gov / abu trip); feeder T1–T4 hijau + beban vital teal
   tersambung solid; pemutus kotak (lurus/miring); legenda 5 item warna dibedakan.
-- **Transport kompak**: satu baris ramping; ▶/❚❚, spd 0,5×/1×/2×, scrubber 0–12 s,
+- **Transport kompak**: satu baris ramping; ▶/❚❚, spd 0,5×/1×/2×, scrubber 0–30 s,
   `t` live, Reset.
 - **Grafik frekuensi**: y 47–52 Hz (grid 0,5 Hz + pita normal ±0,2 hijau lembut +
   garis 50 dipertegas), garis ambang putus-putus copper berlabel T1–T4, penanda
@@ -109,9 +109,10 @@ tunda habis; tahap yang trip **terkunci**; dasar fraksi = beban **pra-gangguan**
   dukungan governor, headroom, defisit) & `Urutan pelepasan` (minus MW, t, f saat trip,
   beban akhir tiap tahap, total lepas). Kartu kiri: unit pembangkit, beban & tahap UFLS
   (+ catatan ambar PLN), skenario, tentang.
-- **Interaksi**: play/pause (requestAnimationFrame, 1 s eng = 0,25 s dinding @1×),
-  speed, scrub (jeda), reset, slider impor (reset run), chip skenario (reset), tab,
-  collapse `.card-b-i`, tooltip ikon "?" (`#qTip`), halo SVG, scrollbar tipis.
+- **Interaksi**: play/pause (requestAnimationFrame, **waktu dinding real-time** —
+  1× = 1 s engineering per 1 s nyata, ADR-0006/plan-03, bukan 0,25 s), speed, scrub
+  (jeda), reset, slider impor (reset run), chip skenario (klik = auto-play, plan-03),
+  tab, collapse `.card-b-i`, tooltip ikon "?" (`#qTip`), halo SVG, scrollbar tipis.
 - Bahasa UI = **Indonesia**; status = warna semantik.
 
 ## 6. Tes & validasi (gerbang per milestone)

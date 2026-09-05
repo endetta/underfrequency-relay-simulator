@@ -189,6 +189,36 @@ check('+Beban besar: collapse RUNTUH, f terpaku 47.0, V lantai 0.85, shed maks 5
   if (st.status !== 'COLLAPSE') throw new Error('statis harus COLLAPSE juga');
 });
 
+/* ── Blok G3 (temuan code-review, PRD §5.3): unit terblok kehilangan kapabilitas
+   (govMax 100 < p0 250 → output dijepit 100 → defisit 150). AGC memulihkan; tanpa
+   AGC f_ss 49.70297 DEFISIT (β G1+G2 = 25250). ── */
+check('Blok G3 AGC ON: AGC memulihkan f → 50.00 (2 langkah, total 150 MW), tanpa trip', () => {
+  const r = A.ufTimeline(P({ scenario: { kind: 'block', target: 'G3', mw: 100 } }));
+  if (r.tripSeq.length !== 0) throw new Error('tak boleh ada trip: ' + JSON.stringify(r.tripSeq));
+  if (r.status !== 'SEIMBANG') throw new Error('harus SEIMBANG, dapat ' + r.status);
+  approx(r.finalF, 50, 1e-6, 'finalF');
+  approx(r.agcDispatch, 150, 1e-6, 'total dispatch AGC');
+  if (r.agcStep !== 2) throw new Error('harus 2 langkah, dapat ' + r.agcStep);
+  if (!r.agcRecovered) throw new Error('harus agcRecovered (f kembali ke pita via AGC)');
+});
+check('Blok G3 AGC OFF: DEFISIT 49.70297 (droop saja) + parity statis↔timeline', () => {
+  const p = P({ scenario: { kind: 'block', target: 'G3', mw: 100 }, agcOn: false });
+  const r = A.ufTimeline(JSON.parse(JSON.stringify(p)));
+  if (r.status !== 'DEFISIT') throw new Error('harus DEFISIT, dapat ' + r.status);
+  approx(r.finalF, 50 - 7500 / 25250, 1e-6, 'finalF');
+  if (r.agcDispatch !== 0) throw new Error('AGC off tak boleh dispatch');
+  const st = A.ufEvaluateStatic(JSON.parse(JSON.stringify(p)));
+  if (Math.abs(r.finalF - st.steadyStateHz) > 1e-6) {
+    throw new Error(`parity: timeline ${r.finalF} vs statis ${st.steadyStateHz}`);
+  }
+});
+check('determinisme: 2× run Blok G3 → JSON identik', () => {
+  const p = P({ scenario: { kind: 'block', target: 'G3', mw: 100 } });
+  const a = A.ufTimeline(JSON.parse(JSON.stringify(p)));
+  const b = A.ufTimeline(JSON.parse(JSON.stringify(p)));
+  if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error('dua run tidak identik');
+});
+
 /* ── validasi param AGC ── */
 check('ufValidate: agcRate negatif & agcInterval < 0,5 → INVALID_PARAM; default bersih', () => {
   const clean = A.ufValidate(P({ scenario: { kind: 'none' } }));

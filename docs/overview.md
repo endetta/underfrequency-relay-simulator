@@ -24,7 +24,7 @@ sepenuhnya berdiri sendiri (ADR-0001).
   tersambung solid; pemutus kotak lurus (tertutup) vs **miring 45° + label TERBUKA**
   (terbuka); legenda 5 item warna dibedakan. TIDAK ada garis putus-putus di jalur daya.
 - **Transport kompak** (≤ 40 px): ▶/❚❚ · 0,5×/1×/2× · scrubber · t · Reset.
-- **Grafik frekuensi** (0–12 s, 47–52 Hz): pita normal ±0,2 Hz hijau, garis 50 Hz,
+- **Grafik frekuensi** (0–30 s, 47–52 Hz): pita normal ±0,2 Hz hijau, garis 50 Hz,
   ambang UFLS putus-putus copper berlabel T1–T4, penanda peristiwa (t=1,0 s) & trip,
   nilai f di playhead; di sampingnya **indikator batang gradien** hijau→copper→merah
   (50 Hz masih hijau, 47 Hz merah) + penunjuk + nilai.
@@ -57,15 +57,15 @@ Peristiwa yang dipicu t=1,0 s: Lepas G1/G3 · Lepas interkoneksi (preset berimpo
 ## Validasi
 
 ```bash
-node tools/model.test.js     # 31 asersi literal (U01 §12 + hitung tangan)
-node tools/timeline.test.js  # 10 asersi (determinisme, parity, RUNTUH)
-node tools/sld.test.js       # 12 asersi geometri SLD
-node tools/charts.test.js    # 13 asersi skala grafik/gauge/tegangan
-node tools/ui.test.js        # 20 asersi seam desain & perilaku
-node tools/shoot.js          # screenshot 6 view → tools/shots/ (+ zoom ASCII SLD)
+node tools/model.test.js     # 33 asersi literal (U01 §12 + hitung tangan)
+node tools/timeline.test.js  # 18 asersi (determinisme, parity, RUNTUH)
+node tools/sld.test.js       # 18 asersi geometri SLD
+node tools/charts.test.js    # 14 asersi skala grafik/gauge/tegangan
+node tools/ui.test.js        # 30 asersi seam desain & perilaku
+node tools/shoot.js          # screenshot 9 view → tools/shots/ (+ zoom ASCII SLD)
 ```
 
-Total **86 asersi**, semuanya hijau di Node ≥ 22 (tanpa dependensi). `tools/shoot.js`
+Total **113 asersi**, semuanya hijau di Node ≥ 22 (tanpa dependensi). `tools/shoot.js`
 mengikuti pola CDP tanpa-npm proyek Differential (Chrome otomatis / `CHROME=/path`).
 
 ## Sumber & keputusan

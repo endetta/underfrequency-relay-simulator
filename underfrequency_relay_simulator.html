@@ -11,7 +11,7 @@
   :root{
     --bg:#F1F3F0; --surface:#FFFFFF; --ink:#16233A; --ink-soft:#4A5568;
     --blue:#1F4E8C; --blue-soft:#E7EEF6; --teal:#13697A; --teal-soft:#E0EFF1; --copper:#B5651D; --copper-deep:#8C4E16; --copper-soft:#F5E9DC;
-    --line:#D6DAD2; --red:#C0392B; --red-soft:#F8E4E1; --green:#2E7D46; --green-soft:#E3F1E7;
+    --line:#D6DAD2; --grid:#E9EBE6; --off:#C9CDD2; --red:#C0392B; --red-soft:#F8E4E1; --green:#2E7D46; --green-soft:#E3F1E7;
   }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;font-size:14px;line-height:1.5;}
@@ -296,6 +296,10 @@
         <div class="card" data-card="skenario">
           <div class="card-h"><span class="dot"></span>Skenario peristiwa<span class="chev">▾</span></div>
           <div class="card-b"><div class="card-b-i">
+            <div class="field">
+              <label><span>Beban tambahan (skenario '+ Beban')</span><span class="qline"><span class="q" data-tip="MW yang dipakai skenario '+ Beban' — ubah nilainya lalu klik chip untuk menjalankan (PRD §4.2 '[angka MW]').">?</span></span><b id="loadStepV">200 MW</b></label>
+              <input type="range" id="loadStepSlider" min="0" max="600" step="25" value="200">
+            </div>
             <div class="btngroup" id="scenGroup"></div>
             <div class="warn" style="margin-top:9px">Peristiwa dipicu di t = 1,0 s setelah <b>▶</b>.</div>
           </div></div>
@@ -410,12 +414,14 @@ var PRESETS = {
   berimpor:{ label: 'Dengan impor 400 MW',     gens: DEFAULT_GENS, loadMw: 1500, importMw: 400 }
 };
 var SCENARIOS = [
-  { id: 'none',     label: 'Seimbang (tanpa peristiwa)',           kind: 'none' },
-  { id: 'g1',       label: 'Lepas G1',                             kind: 'genLoss', target: 'G1' },
-  { id: 'g3',       label: 'Lepas G3',                             kind: 'genLoss', target: 'G3' },
-  { id: 'imp',      label: 'Lepas interkoneksi',                   kind: 'importLoss' },
-  { id: 'load200',  label: '+ Beban 200 MW',                       kind: 'loadStep', mw: 200 },
-  { id: 'runtuh',   label: '+ Beban besar (runtuh)',               kind: 'collapse', mw: 1000 }
+  { id: 'none',    label: 'Seimbang (tanpa peristiwa)',           kind: 'none' },
+  { id: 'g1',      label: 'Lepas G1',                             kind: 'genLoss', target: 'G1' },
+  { id: 'g2',      label: 'Lepas G2',                             kind: 'genLoss', target: 'G2' },
+  { id: 'g3',      label: 'Lepas G3',                             kind: 'genLoss', target: 'G3' },
+  { id: 'imp',     label: 'Lepas interkoneksi',                   kind: 'importLoss' },
+  { id: 'load200', label: '+ Beban 200 MW',                       kind: 'loadStep', mw: 200 },
+  { id: 'block',   label: 'Blok G3 (maks 100 MW)',                kind: 'block', target: 'G3', mw: 100 },
+  { id: 'runtuh',  label: '+ Beban besar (runtuh)',               kind: 'collapse', mw: 1000 }
 ];
 
 /* MW nyata feeder per tahap = fraksi × beban dasar (PRD §3, kejujuran feeder). */
@@ -423,6 +429,49 @@ function ufFeederMw(stages, baseLoad) {
   var m = {};
   stages.forEach(function (s) { m[s.id] = Math.round((s.pct || 0) * baseLoad); });
   return m;
+}
+
+/* ── 2b. Delta skenario MURNI (satu-satunya interpretasi kind — dipakai model &
+   renderer; PRD §3/§5.10: genLoss / importLoss / loadStep / block / collapse). ── */
+function scenarioDelta(scn) {
+  var d = { genOff: null, impLost: false, loadAdd: 0, blockTarget: null, blockMw: null };
+  if (!scn) return d;
+  if (scn.kind === 'genLoss') d.genOff = scn.target;
+  else if (scn.kind === 'importLoss') d.impLost = true;
+  else if (scn.kind === 'loadStep') d.loadAdd = scn.mw || 0;
+  else if (scn.kind === 'block') { d.blockTarget = scn.target; d.blockMw = scn.mw; }
+  else if (scn.kind === 'collapse') { d.impLost = true; d.loadAdd = scn.mw || 1000; }
+  return d;
+}
+function findGen(gens, id) { for (var i = 0; i < gens.length; i++) if (gens[i].id === id) return gens[i]; return null; }
+/* Terapkan delta ke salinan model (gens dimutasi in-place; load/imp dikembalikan).
+   Block: govMax diturunkan & output DIJEPIT ke govMax (PRD §5.3 — unit terblok
+   kehilangan kapabilitas → defisit nyata). */
+function applyScenario(gens, load, imp, scn) {
+  var d = scenarioDelta(scn || { kind: 'none' });
+  var txt = '';
+  if (scn && scn.kind === 'collapse') { imp = 0; load += d.loadAdd; txt = 'Peristiwa: lepas interkoneksi + beban besar'; }
+  else if (d.genOff) {
+    var g = findGen(gens, d.genOff);
+    if (g) { g.online = false; txt = 'Peristiwa: lepas ' + g.id + ' (' + Math.round(g.p0) + ' MW)'; }
+  }
+  else if (d.impLost) { imp = 0; txt = 'Peristiwa: lepas interkoneksi'; }
+  else if (d.loadAdd) { load += d.loadAdd; txt = 'Peristiwa: tambah beban ' + Math.round(d.loadAdd) + ' MW'; }
+  else if (d.blockTarget) {
+    var g2 = findGen(gens, d.blockTarget);
+    if (g2) {
+      g2.govMax = Math.min(g2.govMax, d.blockMw !== null ? d.blockMw : g2.p0);
+      if (g2.p0 > g2.govMax) g2.p0 = g2.govMax;
+      txt = 'Peristiwa: blok ' + g2.id + ' (governor max ' + Math.round(g2.govMax) + ' MW)';
+    }
+  }
+  return { load: load, imp: imp, txt: txt };
+}
+/* Salinan gens dgn efek skenario (offline/block) — dipakai renderer SLD/side. */
+function effGens(p) {
+  var gens = p.gens.map(function (g) { return Object.assign({}, g); });
+  applyScenario(gens, p.loadMw, p.importMw, p.scenario || { kind: 'none' });
+  return gens;
 }
 
 /* ── 3. Agregat (himpunan ONLINE) — PRD §5.2 / U01 §12.1 ── */
@@ -537,11 +586,8 @@ function ufEvaluateStatic(P) {
   var gens = P.gens.map(function (g) { return Object.assign({}, g); });
   var load = P.loadMw, imp = P.importMw || 0;
   var scn = P.scenario || { kind: 'none' };
-  if (scn.kind === 'genLoss') { var g = gens.find(function (x) { return x.id === scn.target; }); if (g) g.online = false; }
-  else if (scn.kind === 'importLoss') { imp = 0; }
-  else if (scn.kind === 'loadStep') { load += scn.mw || 0; }
-  else if (scn.kind === 'block') { var g2 = gens.find(function (x) { return x.id === scn.target; }); if (g2) g2.govMax = Math.min(g2.govMax, scn.mw !== undefined ? scn.mw : g2.p0); }
-  else if (scn.kind === 'collapse') { imp = 0; load += scn.mw || 1000; }
+  var ap = applyScenario(gens, load, imp, scn);
+  load = ap.load; imp = ap.imp;
   var a0 = ufAggregates(gens);
   var D0 = load - a0.pGen0 - imp;
   var baseLoad = P.loadMw;
@@ -601,16 +647,12 @@ function ufTimeline(P) {
   var genCum = {}; // kumulatif setpoint AGC per unit (untuk chip SLD, plan-03 P3)
   if (AGC_ON) agcNext = TEV + AGC_INT;
 
-  function byId(id) { for (var i = 0; i < gens.length; i++) if (gens[i].id === id) return gens[i]; return null; }
   function pushSamples() { ts.push(t); fs.push(f); vs.push(V); }
 
   function applyEvent() {
-    var txt = '';
-    if (scn.kind === 'genLoss') { var g = byId(scn.target); if (g) { g.online = false; txt = 'Peristiwa: lepas ' + g.id + ' (' + Math.round(g.p0) + ' MW)'; } }
-    else if (scn.kind === 'importLoss') { imp = 0; txt = 'Peristiwa: lepas interkoneksi'; }
-    else if (scn.kind === 'loadStep') { load += scn.mw || 0; txt = 'Peristiwa: tambah beban ' + (scn.mw || 0) + ' MW'; }
-    else if (scn.kind === 'block') { var g2 = byId(scn.target); if (g2) { g2.govMax = Math.min(g2.govMax, scn.mw !== undefined ? scn.mw : g2.p0); txt = 'Peristiwa: blok ' + g2.id + ' (governor max ' + Math.round(g2.govMax) + ' MW)'; } }
-    else if (scn.kind === 'collapse') { imp = 0; load += scn.mw || 1000; txt = 'Peristiwa: lepas interkoneksi + beban besar'; }
+    var ap = applyScenario(gens, load, imp, scn);
+    load = ap.load; imp = ap.imp;
+    var txt = ap.txt;
     var a = ufAggregates(gens);
     var D0 = load - a.pGen0 - imp;
     dip = Math.min(0.15, 0.5 * D0 / (a.sBase || 1));
@@ -820,7 +862,7 @@ var S = {
     collapsed: { unit: false, beban: false, kendali: false, skenario: false, tentang: false },
     sideTab: 'kondisi',
     view: 'sld', // tampilan tengah (plan-02 §4.2): 'sld' | 'graf'
-    playing: false, speed: 1, tNow: 0,
+    playing: false, speed: 1, tNow: 0, loadStepMw: 200,
     // player real-time (plan-03 P0): basis waktu dinding + throttle render berat
     lastT: null, lastHeavy: 0, heavyN: 0
   },
@@ -843,13 +885,10 @@ function computeRun() { S.run = ufTimeline(paramP()); if (S.ui.tNow > S.run.tMax
    .openlab (label TERBUKA), .imp (jalur interkoneksi), .vital (feeder vital),
    .lg (item legenda). TIDAK boleh ada stroke-dasharray di jalur daya. */
 function renderSld(p, t, run) {
-  var gens = p.gens, stages = p.stages;
-  var scn = p.scenario || { kind: 'none' };
-  var offline = {}, impLost = false, loadExtra = 0;
-  if (scn.kind === 'genLoss') offline[scn.target] = true;
-  else if (scn.kind === 'importLoss') impLost = true;
-  else if (scn.kind === 'loadStep') loadExtra = scn.mw || 0;
-  else if (scn.kind === 'collapse') { impLost = true; loadExtra = scn.mw || 1000; }
+  var stages = p.stages;
+  var d = scenarioDelta(p.scenario || { kind: 'none' });
+  var offline = {}, impLost = d.impLost, loadExtra = d.loadAdd;
+  if (d.genOff) offline[d.genOff] = true;
   var f = 50, trips = [];
   if (run) {
     f = fAt(run, t);
@@ -858,7 +897,8 @@ function renderSld(p, t, run) {
   var open = {}; trips.forEach(function (x) { open[x.stage] = x; });
   var shedTotal = trips.reduce(function (a, x) { return a + x.mw; }, 0);
   var loadNow = p.loadMw + loadExtra - shedTotal;
-  var gov = ufGovernorAt(gens, f);
+  var eff = effGens(p);
+  var gov = ufGovernorAt(eff, f);
   // kumulatif setpoint AGC per unit sampai playhead (plan-03 P3): diambil dari
   // langkah AGC terakhir yang sudah terjadi (run.agcSteps[i].cum = snapshot).
   var agcCum = {};
@@ -870,50 +910,50 @@ function renderSld(p, t, run) {
   var out = [];
 
   /* ── bus (y=260, plan-02 §4.3) ── */
-  out.push('<line class="bus" x1="70" y1="260" x2="590" y2="260" stroke="#16233A" stroke-width="7" stroke-linecap="round"/>');
-  out.push('<text x="690" y="250" text-anchor="end" font-size="11.5" font-family="JetBrains Mono,monospace" font-weight="600" fill="#4A5568">Beban '
+  out.push('<line class="bus" x1="70" y1="260" x2="590" y2="260" stroke="var(--ink)" stroke-width="7" stroke-linecap="round"/>');
+  out.push('<text x="690" y="250" text-anchor="end" font-size="11.5" font-family="JetBrains Mono,monospace" font-weight="600" fill="var(--ink-soft)">Beban '
     + loadNow + ' MW' + (shedTotal ? ' · lepas ' + shedTotal : '') + '</text>');
 
   /* ── interkoneksi (kiri-atas) ── */
   var impMw = impLost ? 0 : p.importMw;
   var impTxt = impLost ? '0 MW · LEPAS' : impMw + ' MW';
-  var impCol = impLost ? '#C0392B' : '#1F4E8C';
-  var impBg  = impLost ? '#F8E4E1' : '#E7EEF6';
+  var impCol = impLost ? 'var(--red)' : 'var(--blue)';
+  var impBg  = impLost ? 'var(--red-soft)' : 'var(--blue-soft)';
   out.push('<rect class="imp" x="60" y="150" width="110" height="34" rx="7" fill="' + impBg + '" stroke="' + impCol + '"/>');
-  out.push('<text x="115" y="164" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" letter-spacing=".06em" fill="#4A5568">INTERKONEKSI</text>');
+  out.push('<text x="115" y="164" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" letter-spacing=".06em" fill="var(--ink-soft)">INTERKONEKSI</text>');
   out.push('<text x="115" y="178" text-anchor="middle" font-size="12" font-weight="600" font-family="JetBrains Mono,monospace" fill="' + impCol + '">' + impTxt + '</text>');
-  out.push('<line class="imp" x1="115" y1="184" x2="115" y2="252" stroke="#16233A" stroke-width="3"/>');
-  out.push('<rect class="brk" data-open="' + (impLost ? 1 : 0) + '" x="111" y="252" width="8" height="8" fill="' + (impLost ? '#F8E4E1' : '#FFFFFF') + '" stroke="' + (impLost ? '#C0392B' : '#16233A') + '" stroke-width="1.5"'
+  out.push('<line class="imp" x1="115" y1="184" x2="115" y2="252" stroke="var(--ink)" stroke-width="3"/>');
+  out.push('<rect class="brk" data-open="' + (impLost ? 1 : 0) + '" x="111" y="252" width="8" height="8" fill="' + (impLost ? 'var(--red-soft)' : 'var(--surface)') + '" stroke="' + (impLost ? 'var(--red)' : 'var(--ink)') + '" stroke-width="1.5"'
     + (impLost ? ' transform="rotate(45 115 256)"' : '') + '/>');
-  if (impLost) out.push('<text class="openlab" x="115" y="246" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" fill="#C0392B" paint-order="stroke" stroke="#FFFFFF" stroke-width="3">TERBUKA</text>');
+  if (impLost) out.push('<text class="openlab" x="115" y="246" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" fill="var(--red)" paint-order="stroke" stroke="var(--surface)" stroke-width="3">TERBUKA</text>');
 
   /* ── generator (bawah bus): lingkaran + salib (×) + chip SAMPING RPM/MW ── */
   var gx = [170, 350, 530];
-  gens.forEach(function (g, i) {
+  eff.forEach(function (g, i) {
     var x = gx[i];
     var isOff = offline[g.id] === true;
-    out.push('<line x1="' + x + '" y1="260" x2="' + x + '" y2="300" stroke="#16233A" stroke-width="3"/>');
-    out.push('<circle class="gen" cx="' + x + '" cy="322" r="22" fill="#FFFFFF" stroke="' + (isOff ? '#C9CDD2' : '#16233A') + '" stroke-width="2"/>');
+    out.push('<line x1="' + x + '" y1="260" x2="' + x + '" y2="300" stroke="var(--ink)" stroke-width="3"/>');
+    out.push('<circle class="gen" cx="' + x + '" cy="322" r="22" fill="var(--surface)" stroke="' + (isOff ? 'var(--off)' : 'var(--ink)') + '" stroke-width="2"/>');
     // salib × (simbol generator standar)
-    out.push('<line class="xc" x1="' + (x - 15) + '" y1="307" x2="' + (x + 15) + '" y2="337" stroke="' + (isOff ? '#C9CDD2' : '#16233A') + '" stroke-width="2"/>');
-    out.push('<line class="xc" x1="' + (x - 15) + '" y1="337" x2="' + (x + 15) + '" y2="307" stroke="' + (isOff ? '#C9CDD2' : '#16233A') + '" stroke-width="2"/>');
-    out.push('<text x="' + x + '" y="364" text-anchor="middle" font-size="12" font-family="Space Grotesk,sans-serif" font-weight="600" fill="#16233A">' + g.id + '</text>');
+    out.push('<line class="xc" x1="' + (x - 15) + '" y1="307" x2="' + (x + 15) + '" y2="337" stroke="' + (isOff ? 'var(--off)' : 'var(--ink)') + '" stroke-width="2"/>');
+    out.push('<line class="xc" x1="' + (x - 15) + '" y1="337" x2="' + (x + 15) + '" y2="307" stroke="' + (isOff ? 'var(--off)' : 'var(--ink)') + '" stroke-width="2"/>');
+    out.push('<text x="' + x + '" y="364" text-anchor="middle" font-size="12" font-family="Space Grotesk,sans-serif" font-weight="600" fill="var(--ink)">' + g.id + '</text>');
     // chip samping kanan: status + RPM + MW (droop + setpoint AGC; cap di govMax)
     var rpm = isOff ? 0 : Math.round(120 * f / g.poles); // n = 120·f/P (P = kutub)
     var mw = isOff ? 0 : g.p0 + gov.resp[g.id] + (agcCum[g.id] || 0);
     if (!isOff && g.govMax > g.p0) mw = Math.min(mw, g.govMax);
     var sat = !isOff && g.govMax > g.p0 && gov.resp[g.id] >= g.govMax - g.p0 - 1e-9 && f < 50;
-    var chipBg = isOff ? '#EEF0F2' : (sat ? '#F5E9DC' : '#E3F1E7');
-    var chipBd = isOff ? '#C9CDD2' : (sat ? '#B5651D' : '#2E7D46');
+    var chipBg = isOff ? 'var(--bg)' : (sat ? 'var(--copper-soft)' : 'var(--green-soft)');
+    var chipBd = isOff ? 'var(--off)' : (sat ? 'var(--copper)' : 'var(--green)');
     var cx = x + 93; // pusat chip
     out.push('<rect class="chip" cx-chip="' + x + '" x="' + (x + 34) + '" y="296" width="118" height="44" rx="7" fill="' + chipBg + '" stroke="' + chipBd + '"/>');
-    out.push('<text x="' + cx + '" y="315" text-anchor="middle" font-size="12" font-weight="600" font-family="JetBrains Mono,monospace" fill="#16233A">' + (isOff ? 'TRIP' : 'RPM ' + rpm) + '</text>');
-    out.push('<text class="chipmw" x="' + cx + '" y="331" text-anchor="middle" font-size="11" font-family="JetBrains Mono,monospace" fill="' + (isOff ? '#C9CDD2' : (sat ? '#8C4E16' : '#2E7D46')) + '">'
+    out.push('<text x="' + cx + '" y="315" text-anchor="middle" font-size="12" font-weight="600" font-family="JetBrains Mono,monospace" fill="var(--ink)">' + (isOff ? 'TRIP' : 'RPM ' + rpm) + '</text>');
+    out.push('<text class="chipmw" x="' + cx + '" y="331" text-anchor="middle" font-size="11" font-family="JetBrains Mono,monospace" fill="' + (isOff ? 'var(--off)' : (sat ? 'var(--copper-deep)' : 'var(--green)')) + '">'
       + (isOff ? '0 MW' : (sat ? Math.round(mw) + ' MW · maks gov' : Math.round(mw) + ' MW')) + '</text>');
     // label kecil AGC (plan-03 P3): unit yang menerima setpoint kendali sekunder
     if (!isOff && (agcCum[g.id] || 0) > 0.5) {
-      out.push('<rect class="agctag" x="' + (cx - 16) + '" y="282" width="32" height="13" rx="4" fill="#F5E9DC" stroke="#B5651D" stroke-width="1"/>');
-      out.push('<text x="' + cx + '" y="291.5" text-anchor="middle" font-size="10" font-weight="600" font-family="JetBrains Mono,monospace" fill="#8C4E16">AGC</text>');
+      out.push('<rect class="agctag" x="' + (cx - 16) + '" y="282" width="32" height="13" rx="4" fill="var(--copper-soft)" stroke="var(--copper)" stroke-width="1"/>');
+      out.push('<text x="' + cx + '" y="291.5" text-anchor="middle" font-size="10" font-weight="600" font-family="JetBrains Mono,monospace" fill="var(--copper-deep)">AGC</text>');
     }
   });
 
@@ -924,20 +964,20 @@ function renderSld(p, t, run) {
   fed.forEach(function (fd, i) {
     var x = fx[i];
     var isOpen = open[fd.id] !== undefined;
-    var col = fd.vital ? '#13697A' : '#2E7D46';
-    var bg  = fd.vital ? '#E0EFF1' : '#E3F1E7';
+    var col = fd.vital ? 'var(--teal)' : 'var(--green)';
+    var bg  = fd.vital ? 'var(--teal-soft)' : 'var(--green-soft)';
     var txt = fd.vital ? 'VITAL · ' + fd.mw + ' MW' : fd.id + ' · ' + fd.mw + ' MW';
     out.push('<line x1="' + x + '" y1="72" x2="' + x + '" y2="252" stroke="' + col + '" stroke-width="3"/>');
-    out.push('<rect class="brk" data-open="' + (isOpen ? 1 : 0) + '" x="' + (x - 4) + '" y="244" width="8" height="8" fill="' + (isOpen ? '#F8E4E1' : '#FFFFFF') + '" stroke="' + (isOpen ? '#C0392B' : '#16233A') + '" stroke-width="1.5"'
+    out.push('<rect class="brk" data-open="' + (isOpen ? 1 : 0) + '" x="' + (x - 4) + '" y="244" width="8" height="8" fill="' + (isOpen ? 'var(--red-soft)' : 'var(--surface)') + '" stroke="' + (isOpen ? 'var(--red)' : 'var(--ink)') + '" stroke-width="1.5"'
       + (isOpen ? ' transform="rotate(45 ' + x + ' 248)"' : '') + '/>');
-    if (isOpen) out.push('<text class="openlab" x="' + x + '" y="238" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" fill="#C0392B" paint-order="stroke" stroke="#FFFFFF" stroke-width="3">TERBUKA</text>');
+    if (isOpen) out.push('<text class="openlab" x="' + x + '" y="238" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" fill="var(--red)" paint-order="stroke" stroke="var(--surface)" stroke-width="3">TERBUKA</text>');
     // panah aliran saat tertutup
     if (!isOpen) {
       out.push('<path class="flow" d="M ' + (x - 4) + ' 150 l 8 0 l -4 -7 z" fill="' + col + '"/>');
       out.push('<path class="flow" d="M ' + (x - 4) + ' 185 l 8 0 l -4 -7 z" fill="' + col + '"/>');
     }
     out.push('<rect x="' + (x - 55) + '" y="36" width="110" height="36" rx="7" fill="' + bg + '" stroke="' + col + '"/>');
-    out.push('<text x="' + x + '" y="58" text-anchor="middle" font-size="11" font-family="JetBrains Mono,monospace" font-weight="600" fill="' + (fd.vital ? '#13697A' : '#2E7D46') + '">' + txt + '</text>');
+    out.push('<text x="' + x + '" y="58" text-anchor="middle" font-size="11" font-family="JetBrains Mono,monospace" font-weight="600" fill="' + (fd.vital ? 'var(--teal)' : 'var(--green)') + '">' + txt + '</text>');
   });
 
   return out.join('\n');
@@ -953,31 +993,31 @@ function tToX(t) { return 38 + t / 30 * 628; }
 
 function renderFreq(p, run, t) {
   var out = [];
-  out.push('<rect class="bg" x="0" y="0" width="680" height="250" fill="#FFFFFF"/>');
+  out.push('<rect class="bg" x="0" y="0" width="680" height="250" fill="var(--surface)"/>');
   // grid y (0.5 Hz) + label
   for (var f = 47; f <= 52; f += 0.5) {
     var y = fToY(f).toFixed(1);
-    out.push('<line x1="38" y1="' + y + '" x2="666" y2="' + y + '" stroke="#E9EBE6" stroke-width="1"/>');
+    out.push('<line x1="38" y1="' + y + '" x2="666" y2="' + y + '" stroke="var(--grid)" stroke-width="1"/>');
   }
   for (var fl = 47; fl <= 52; fl++) {
-    out.push('<text x="32" y="' + (fToY(fl) + 4).toFixed(1) + '" text-anchor="end" font-size="10.5" font-family="JetBrains Mono,monospace" fill="#4A5568">' + fl.toFixed(1) + '</text>');
+    out.push('<text x="32" y="' + (fToY(fl) + 4).toFixed(1) + '" text-anchor="end" font-size="10.5" font-family="JetBrains Mono,monospace" fill="var(--ink-soft)">' + fl.toFixed(1) + '</text>');
   }
   // grid x (5 s)
   for (var tt = 0; tt <= 30; tt += 5) {
     var x = tToX(tt).toFixed(1);
-    out.push('<line x1="' + x + '" y1="12" x2="' + x + '" y2="226" stroke="#F0F1EC" stroke-width="1"/>');
-    out.push('<text x="' + x + '" y="240" text-anchor="middle" font-size="10.5" font-family="JetBrains Mono,monospace" fill="#4A5568">' + tt + 's</text>');
+    out.push('<line x1="' + x + '" y1="12" x2="' + x + '" y2="226" stroke="var(--grid)" stroke-width="1"/>');
+    out.push('<text x="' + x + '" y="240" text-anchor="middle" font-size="10.5" font-family="JetBrains Mono,monospace" fill="var(--ink-soft)">' + tt + 's</text>');
   }
   // pita normal ±0.2 (50.2 → 49.8)
   var yHi = fToY(50.2), yLo = fToY(49.8);
-  out.push('<rect class="band" x="38" y="' + yHi.toFixed(2) + '" width="628" height="' + (yLo - yHi).toFixed(2) + '" fill="#E3F1E7" opacity="0.4"/>');
+  out.push('<rect class="band" x="38" y="' + yHi.toFixed(2) + '" width="628" height="' + (yLo - yHi).toFixed(2) + '" fill="var(--green-soft)" opacity="0.4"/>');
   // garis 50 Hz ditegaskan
-  out.push('<line x1="38" y1="' + fToY(50).toFixed(1) + '" x2="666" y2="' + fToY(50).toFixed(1) + '" stroke="#16233A" stroke-width="2"/>');
+  out.push('<line x1="38" y1="' + fToY(50).toFixed(1) + '" x2="666" y2="' + fToY(50).toFixed(1) + '" stroke="var(--ink)" stroke-width="2"/>');
   // ambang UFLS (putus-putus copper) + label
   (p.stages || []).forEach(function (st) {
     var yt = fToY(st.thr).toFixed(1);
-    out.push('<line class="thr" x1="38" y1="' + yt + '" x2="666" y2="' + yt + '" stroke="#B5651D" stroke-width="1.3" stroke-dasharray="6 4"/>');
-    out.push('<text x="670" y="' + (parseFloat(yt) + 4).toFixed(1) + '" font-size="10.5" font-family="JetBrains Mono,monospace" font-weight="600" fill="#8C4E16">' + st.id + '</text>');
+    out.push('<line class="thr" x1="38" y1="' + yt + '" x2="666" y2="' + yt + '" stroke="var(--copper)" stroke-width="1.3" stroke-dasharray="6 4"/>');
+    out.push('<text x="670" y="' + (parseFloat(yt) + 4).toFixed(1) + '" font-size="10.5" font-family="JetBrains Mono,monospace" font-weight="600" fill="var(--copper-deep)">' + st.id + '</text>');
   });
   // kurva f(t)
   var pts = [];
@@ -985,24 +1025,24 @@ function renderFreq(p, run, t) {
     if (run.ts[i] > 30) break;
     pts.push(tToX(run.ts[i]).toFixed(1) + ',' + fToY(run.fs[i]).toFixed(1));
   }
-  out.push('<polyline points="' + pts.join(' ') + '" fill="none" stroke="#1F4E8C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>');
+  out.push('<polyline points="' + pts.join(' ') + '" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>');
   // penanda peristiwa (t = tEvent) & trip (sampai playhead)
   var evT = 1.0;
   if (run.ev && run.ev.length) {
     var xe = tToX(run.ev[0].t).toFixed(1);
-    out.push('<line class="ev" x1="' + xe + '" x2="' + xe + '" y1="12" y2="226" stroke="#B5651D" stroke-width="1" stroke-dasharray="2 3"/>');
-    out.push('<text x="' + xe + '" y="13" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" fill="#B5651D">peristiwa</text>');
+    out.push('<line class="ev" x1="' + xe + '" x2="' + xe + '" y1="12" y2="226" stroke="var(--copper)" stroke-width="1" stroke-dasharray="2 3"/>');
+    out.push('<text x="' + xe + '" y="13" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" fill="var(--copper)">peristiwa</text>');
   }
   (run.tripSeq || []).forEach(function (tr) {
     if (tr.t > t + 1e-9) return;
     var xt = tToX(tr.t).toFixed(1), yt2 = fToY(tr.fAt).toFixed(1);
-    out.push('<circle class="trip" cx="' + xt + '" cy="' + yt2 + '" r="4.5" fill="#C0392B" stroke="#FFFFFF" stroke-width="1.5"/>');
+    out.push('<circle class="trip" cx="' + xt + '" cy="' + yt2 + '" r="4.5" fill="var(--red)" stroke="var(--surface)" stroke-width="1.5"/>');
   });
   // nilai f di playhead
   var fNow = fAt(run, t);
   var xp = Math.min(tToX(Math.min(t, 30)).toFixed(1), 666);
-  out.push('<line x1="' + xp + '" x2="' + xp + '" y1="12" y2="226" stroke="#1F4E8C" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>');
-  out.push('<text x="' + xp + '" y="238" text-anchor="middle" font-size="10.5" font-family="JetBrains Mono,monospace" fill="#1F4E8C">' + fNow.toFixed(2) + '</text>');
+  out.push('<line x1="' + xp + '" x2="' + xp + '" y1="12" y2="226" stroke="var(--blue)" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>');
+  out.push('<text x="' + xp + '" y="238" text-anchor="middle" font-size="10.5" font-family="JetBrains Mono,monospace" fill="var(--blue)">' + fNow.toFixed(2) + '</text>');
   return out.join('\n');
 }
 
@@ -1011,43 +1051,43 @@ function renderGauge(f) {
   out.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 74 250">');
   out.push('<defs><linearGradient id="fg" x1="0" y1="0" x2="0" y2="1">');
   // plan-02 §4.4b: hijau HANYA di pita normal 50,2→49,8; over-frekuensi copper; bawah fade merah
-  out.push('<stop offset="0%" stop-color="#B5651D"/>');   // 52 Hz — over-frekuensi
-  out.push('<stop offset="36%" stop-color="#B5651D"/>'); // 50,2 Hz — batas atas pita normal
-  out.push('<stop offset="38%" stop-color="#2E7D46"/>'); // hijau mulai
-  out.push('<stop offset="44%" stop-color="#2E7D46"/>'); // 49,8 Hz — batas bawah pita normal
-  out.push('<stop offset="62%" stop-color="#B5651D"/>'); // transisi ke merah
-  out.push('<stop offset="100%" stop-color="#C0392B"/>'); // 47 Hz merah
+  out.push('<stop offset="0%" stop-color="var(--copper)"/>');   // 52 Hz — over-frekuensi
+  out.push('<stop offset="36%" stop-color="var(--copper)"/>'); // 50,2 Hz — batas atas pita normal
+  out.push('<stop offset="38%" stop-color="var(--green)"/>'); // hijau mulai
+  out.push('<stop offset="44%" stop-color="var(--green)"/>'); // 49,8 Hz — batas bawah pita normal
+  out.push('<stop offset="62%" stop-color="var(--copper)"/>'); // transisi ke merah
+  out.push('<stop offset="100%" stop-color="var(--red)"/>'); // 47 Hz merah
   out.push('</linearGradient></defs>');
   out.push('<rect x="30" y="12" width="18" height="214" rx="4" fill="url(#fg)"/>');
   for (var fg = 47; fg <= 52; fg++) {
     var y = fToY(fg).toFixed(1);
-    out.push('<line x1="50" y1="' + y + '" x2="58" y2="' + y + '" stroke="#4A5568" stroke-width="1"/>');
-    out.push('<text x="64" y="' + (parseFloat(y) + 3).toFixed(1) + '" font-size="10" font-family="JetBrains Mono,monospace" fill="#4A5568">' + fg + '</text>');
+    out.push('<line x1="50" y1="' + y + '" x2="58" y2="' + y + '" stroke="var(--ink-soft)" stroke-width="1"/>');
+    out.push('<text x="64" y="' + (parseFloat(y) + 3).toFixed(1) + '" font-size="10" font-family="JetBrains Mono,monospace" fill="var(--ink-soft)">' + fg + '</text>');
   }
   var yp = fToY(Math.max(47, Math.min(52, f)));
-  out.push('<line class="pt" x1="20" y1="' + yp.toFixed(1) + '" x2="30" y2="' + yp.toFixed(1) + '" stroke="#16233A" stroke-width="4" stroke-linecap="round"/>');
-  out.push('<text x="37" y="244" text-anchor="middle" font-size="11" font-weight="600" font-family="JetBrains Mono,monospace" fill="#16233A">' + f.toFixed(2) + ' Hz</text>');
+  out.push('<line class="pt" x1="20" y1="' + yp.toFixed(1) + '" x2="30" y2="' + yp.toFixed(1) + '" stroke="var(--ink)" stroke-width="4" stroke-linecap="round"/>');
+  out.push('<text x="37" y="244" text-anchor="middle" font-size="11" font-weight="600" font-family="JetBrains Mono,monospace" fill="var(--ink)">' + f.toFixed(2) + ' Hz</text>');
   out.push('</svg>');
   return out.join('\n');
 }
 
 function renderVolt(run) {
   var out = [];
-  out.push('<rect x="0" y="0" width="680" height="190" fill="#FFFFFF"/>');
+  out.push('<rect x="0" y="0" width="680" height="190" fill="var(--surface)"/>');
   // skala pu 0.85–1.05 (0.05/langkah), y = 12 + (1.05−v)/0.2·152
   for (var vi = 85; vi <= 105; vi += 5) { // langkah integer (hindari akumulasi float)
     var v = vi / 100;
     var yv = (12 + (1.05 - v) / 0.2 * 152).toFixed(1);
-    out.push('<line x1="38" y1="' + yv + '" x2="666" y2="' + yv + '" stroke="#E9EBE6" stroke-width="1"/>');
-    out.push('<text x="32" y="' + (parseFloat(yv) + 4).toFixed(1) + '" text-anchor="end" font-size="10.5" font-family="JetBrains Mono,monospace" fill="#4A5568">' + v.toFixed(2) + '</text>');
+    out.push('<line x1="38" y1="' + yv + '" x2="666" y2="' + yv + '" stroke="var(--grid)" stroke-width="1"/>');
+    out.push('<text x="32" y="' + (parseFloat(yv) + 4).toFixed(1) + '" text-anchor="end" font-size="10.5" font-family="JetBrains Mono,monospace" fill="var(--ink-soft)">' + v.toFixed(2) + '</text>');
   }
   for (var tt = 0; tt <= 30; tt += 5) {
     var x = tToX(tt).toFixed(1);
-    out.push('<text x="' + x + '" y="184" text-anchor="middle" font-size="10.5" font-family="JetBrains Mono,monospace" fill="#4A5568">' + tt + 's</text>');
+    out.push('<text x="' + x + '" y="184" text-anchor="middle" font-size="10.5" font-family="JetBrains Mono,monospace" fill="var(--ink-soft)">' + tt + 's</text>');
   }
   // lantai 0.85
-  out.push('<line class="floor" x1="38" y1="164" x2="666" y2="164" stroke="#C0392B" stroke-width="1" stroke-dasharray="6 4" opacity="0.7"/>');
-  out.push('<text x="670" y="168" text-anchor="end" font-size="10" font-family="JetBrains Mono,monospace" fill="#C0392B">lantai 0.85</text>');
+  out.push('<line class="floor" x1="38" y1="164" x2="666" y2="164" stroke="var(--red)" stroke-width="1" stroke-dasharray="6 4" opacity="0.7"/>');
+  out.push('<text x="670" y="168" text-anchor="end" font-size="10" font-family="JetBrains Mono,monospace" fill="var(--red)">lantai 0.85</text>');
   var pts = [];
   for (var i = 0; i < run.vs.length; i++) {
     if (run.ts[i] > 30) break;
@@ -1055,7 +1095,7 @@ function renderVolt(run) {
     var yv2 = (12 + (1.05 - run.vs[i]) / 0.2 * 152).toFixed(1);
     pts.push(xv + ',' + yv2);
   }
-  out.push('<polyline points="' + pts.join(' ') + '" fill="none" stroke="#13697A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>');
+  out.push('<polyline points="' + pts.join(' ') + '" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>');
   return out.join('\n');
 }
 
@@ -1076,6 +1116,15 @@ function renderVoltInto() {
 }
 function renderCharts() { renderFreqInto(); renderGaugeInto(); renderVoltInto(); }
 
+/* RUNTUH mulai saat f menempel lantai 47 Hz (dipakai pill status & tag SLD). */
+function collapseAt(run, t) {
+  if (!run || !run.collapse) return false;
+  for (var i = 0; i < run.fs.length; i++) {
+    if (run.fs[i] <= 47.0001) return t >= run.ts[i] - 1e-9;
+  }
+  return false;
+}
+
 /* nilai f pada waktu t (interpolasi linear antar sampel run) */
 function fAt(run, t) {
   var ts = run.ts, fs = run.fs;
@@ -1095,12 +1144,8 @@ function fAt(run, t) {
    pelepasan berurutan dgn MW nyata + beban sebelum/sesudah. Pill semantik
    .st-seimbang/.st-defisit/.st-pelepasan/.st-pemulihan/.st-runtuh. */
 function renderSide(p, run, t, tab) {
-  var scn = p.scenario || { kind: 'none' };
-  var offline = {}, impLost = false, loadExtra = 0;
-  if (scn.kind === 'genLoss') offline[scn.target] = true;
-  else if (scn.kind === 'importLoss') impLost = true;
-  else if (scn.kind === 'loadStep') loadExtra = scn.mw || 0;
-  else if (scn.kind === 'collapse') { impLost = true; loadExtra = scn.mw || 1000; }
+  var d = scenarioDelta(p.scenario || { kind: 'none' });
+  var impLost = d.impLost, loadExtra = d.loadAdd;
   var f = 50, trips = [];
   if (run) {
     f = fAt(run, t);
@@ -1109,17 +1154,9 @@ function renderSide(p, run, t, tab) {
   var shedTotal = trips.reduce(function (a, x) { return a + x.mw; }, 0);
   var loadNow = p.loadMw + loadExtra - shedTotal;
   var impNow = impLost ? 0 : p.importMw;
-  var gensEff = p.gens.map(function (g) {
-    return offline[g.id] ? Object.assign({}, g, { online: false }) : g;
-  });
-  var gov = ufGovernorAt(gensEff, f);
+  var gov = ufGovernorAt(effGens(p), f);
   var deficit = loadNow - gov.sup - impNow;
-  var collapse = false;
-  if (run && run.collapse) {
-    for (var i = 0; i < run.fs.length; i++) {
-      if (run.fs[i] <= 47.0001) { collapse = t >= run.ts[i] - 1e-9; break; }
-    }
-  }
+  var collapse = collapseAt(run, t);
   var status = ufStatus(f, { trips: trips.length, collapse: collapse });
   var cls = { SEIMBANG: 'st-seimbang', DEFISIT: 'st-defisit', 'PELEPASAN BEBAN': 'st-pelepasan', PEMULIHAN: 'st-pemulihan', RUNTUH: 'st-runtuh' }[status] || 'st-defisit';
   var h = '<div class="pill ' + cls + '">' + status + '</div>';
@@ -1215,13 +1252,19 @@ function renderStageList() {
   });
   el.innerHTML = h;
 }
+function scenObj(sc) {
+  // beban [MW] (PRD §4.2) — nilai hidup dari slider, bukan literal SCENARIOS
+  return sc.kind === 'loadStep' ? { kind: 'loadStep', mw: S.ui.loadStepMw } : sc;
+}
 function renderScenGroup() {
   var el = document.getElementById('scenGroup');
   if (!el) return;
   var h = '';
   SCENARIOS.forEach(function (sc) {
-    var active = S.param.scenario.kind === sc.kind && JSON.stringify(S.param.scenario) === JSON.stringify(sc);
-    h += '<button class="scen' + (active ? ' active' : '') + '" data-scen="' + sc.id + '">' + sc.label + '</button>';
+    var obj = scenObj(sc);
+    var label = sc.kind === 'loadStep' ? '+ Beban ' + S.ui.loadStepMw + ' MW' : sc.label;
+    var active = S.param.scenario.kind === obj.kind && JSON.stringify(S.param.scenario) === JSON.stringify(obj);
+    h += '<button class="scen' + (active ? ' active' : '') + '" data-scen="' + sc.id + '">' + label + '</button>';
   });
   el.innerHTML = h;
 }
@@ -1248,13 +1291,7 @@ function renderSldInto() {
   if (tag && S.run) {
     var f = fAt(S.run, t);
     var trips = S.run.tripSeq.filter(function (x) { return x.t <= t + 1e-9; }).length;
-    var collapse = false;
-    if (S.run.collapse) { // RUNTUH mulai saat f menempel lantai 47 Hz
-      for (var i = 0; i < S.run.fs.length; i++) {
-        if (S.run.fs[i] <= 47.0001) { collapse = t >= S.run.ts[i] - 1e-9; break; }
-      }
-    }
-    tag.textContent = ufStatus(f, { trips: trips, collapse: collapse }) + ' · ' + f.toFixed(2) + ' Hz';
+    tag.textContent = ufStatus(f, { trips: trips, collapse: collapseAt(S.run, t) }) + ' · ' + f.toFixed(2) + ' Hz';
   }
 }
 function render() {
@@ -1321,6 +1358,7 @@ function bind() {
     // plan-03 P0: skenario 'Lepas interkoneksi' butuh sistem berimpor — kalau preset
     // masih mandiri, paksa ganti ke berimpor agar skenario selalu punya efek.
     if (sc && sc.kind === 'importLoss' && S.param.presetId !== 'berimpor') applyPreset('berimpor');
+    if (sc && sc.kind === 'loadStep') sc = { kind: 'loadStep', mw: S.ui.loadStepMw }; // beban [MW] (PRD §4.2)
     S.param.scenario = clone(sc || { kind: 'none' });
     S.ui.playing = false; S.ui.tNow = 0; computeRun(); render();
     play(); // auto-play (plan-03 P0 §0b): klik skenario → langsung jalan
@@ -1339,6 +1377,17 @@ function bind() {
   if (el('impSlider')) el('impSlider').addEventListener('input', function (e) {
     S.param.importMw = parseFloat(e.target.value) || 0;
     S.ui.playing = false; S.ui.tNow = 0; computeRun(); render();
+  });
+  // beban tambahan [MW] (PRD §4.2) — ubah label chip; saat skenario loadStep aktif, recompute run
+  if (el('loadStepSlider')) el('loadStepSlider').addEventListener('input', function (e) {
+    S.ui.loadStepMw = Math.max(0, parseFloat(e.target.value) || 0);
+    var lv = el('loadStepV'); if (lv) lv.textContent = S.ui.loadStepMw + ' MW';
+    if (S.param.scenario.kind === 'loadStep') {
+      S.param.scenario.mw = S.ui.loadStepMw;
+      computeRun(); render();
+    } else {
+      renderScenGroup();
+    }
   });
   if (el('tabKondisi')) el('tabKondisi').addEventListener('click', function () { setSideTab('kondisi'); });
   if (el('tabUrutan')) el('tabUrutan').addEventListener('click', function () { setSideTab('urutan'); });
@@ -1561,6 +1610,10 @@ var API = {
   ufEvaluateStatic: ufEvaluateStatic,
   ufTimeline: ufTimeline,
   ufFeederMw: ufFeederMw,
+  scenarioDelta: scenarioDelta,
+  applyScenario: applyScenario,
+  effGens: effGens,
+  collapseAt: collapseAt,
   DEFAULT_GENS: DEFAULT_GENS,
   DEFAULT_STAGES: DEFAULT_STAGES,
   PRESETS: PRESETS,

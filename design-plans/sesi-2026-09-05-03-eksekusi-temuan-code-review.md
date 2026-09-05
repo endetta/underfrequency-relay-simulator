@@ -1,0 +1,14 @@
+# Sesi 2026-09-05-03 — Eksekusi temuan code-review (M7): skenario lengkap PRD, block fix, refactor skenario, var(:root), sinkronisasi dokumen
+
+- **Mulai:** lanjutan sesi 01/02 · **Commit sebelum:** `613631a` (M6) · **Repo:** endetta/underfrequency-relay-simulator @ main
+- **Mandat user:** (1) pindahkan instruksi agen (CLAUDE.md) ke dalam folder UFR agar self-contained (root CLAUDE.md tetap; skill agen tidak dipindah); (2) via skill `code-review` (cakupan "max proyek ini" = M0–M6 + working tree) → kemudian skill `implement` → user memilih cakupan **"Standar + semua skenario PRD"**.
+- **Dikerjakan & hasil (TDD merah → hijau):**
+  - **CLAUDE.md self-contained**: section baru "Aturan umum workspace — SELF-CONTAINED" (git identity, 7 aturan umum, peta library) + dedup (daftar id hard-code & aturan Windows/LF yang ganda dihapus) + bullet M7.
+  - **Refactor duplikasi**: interpretasi `kind` skenario yang sebelumnya di-4-situs (ufEvaluateStatic, ufTimeline.applyEvent, renderSld, renderSide) disatukan ke **`scenarioDelta`/`applyScenario`/`effGens`** (murni, diekspor API); loop deteksi RUNTUH yang di-2-situs → **`collapseAt`**.
+  - **Fix model GENERATOR_BLOCK (PRD §5.3)**: output unit kini **dijepit ke govMax** saat diblok → defisit nyata (sebelumnya inert). Skenario baru **Blok G3 (maks 100 MW)**: defisit 150, AGC 2 langkah → 50,00; tanpa AGC f_ss 49,70297 DEFISIT (parity statis↔timeline).
+  - **Skenario lengkap PRD §4.2/§5.10**: chip **Lepas G2**, **Blok G3**, dan **beban tambahan [MW]** (slider `#loadStepSlider` + label `#loadStepV`; chip '+ Beban N MW' hidup; saat skenario loadStep aktif, slider recompute run). Total 8 chip (dulu 6).
+  - **Hex → `var(--*)`** di renderSld/renderFreq/renderGauge/renderVolt (standar implementation-plan §8); var baru `--grid:#E9EBE6` & `--off:#C9CDD2` di `:root`.
+  - **Bukti:** 5 suite hijau — model 33 · timeline 18 · sld 18 · charts 14 · ui 30 = **113 asersi**; shoot **9 view** bersih (bodyScroll=0 desktop, sldScale 1,11, font 11,11, overflow none, consoleErrors=0; view baru `blok` = G3 chip **100 MW** + badge AGC di G1/G2); **playcheck PASS** (rasio 0,92 · monoton · stop bersih · heavyN 16 · consoleErrors=0).
+- **Dokumen tersinkron:** CLAUDE.md (M7 + dedup + self-contained) · PRD §4.4 (jendela 0–30 s) · overview.md (0–30 s, 9 view, jumlah asersi 113) · implementation-plan §5 (scrubber 0–30 s, real-time) · log ini.
+- **Status:** SELESAI — semua temuan code-review yang disetujui user dieksekusi & teruji.
+- **Langkah berikutnya (untuk sesi/AI baru):** — (M7 tuntas, belum di-commit saat log ini ditulis; commit batch + CLAUDE.md self-contained menyusul). Bila user lanjut: mulai dari CLAUDE.md proyek → log ini. File kunci: `underfrequency_relay_simulator.html` (scenarioDelta/applyScenario/effGens §2b, applyEvent §10, renderSld/renderSide §13, renderScenGroup/scenObj §14, slider beban §16), `tools/*.test.js`.
