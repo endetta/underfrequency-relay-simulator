@@ -46,6 +46,7 @@ check('baseline: bus solid tebal (stroke-width 7), TANPA stroke-dasharray di jal
   if (!s.includes('stroke-width="7"')) throw new Error('bus harus tebal');
   if (s.includes('stroke-dasharray')) throw new Error('jalur daya tidak boleh putus-putus');
 });
+// M16-A: urutan gambar bus diuji terpisah (lihat blok M16-A di bawah) — bus paling atas.
 check('baseline: 6 pemutus lurus (1 impor + 5 feeder), tanpa rotasi, tanpa label TERBUKA', () => {
   const s = renderAt(baseP, baseRun, 0);
   if (count(s, 'class="brk"') !== 6) throw new Error('harus 6 pemutus (1 impor + 4 tahap + vital), dapat ' + count(s, 'class="brk"'));
@@ -83,7 +84,7 @@ check('lepas interkoneksi (t=1.3): pemutus impor miring 45° + label TERBUKA + 0
   const s = renderAt(impP, impRun, 1.3);
   if (!s.includes('0 MW · LEPAS')) throw new Error('label impor harus 0 MW · LEPAS');
   if (count(s, 'data-open="1"') !== 1) throw new Error('tepat 1 pemutus terbuka (impor)');
-  if (!s.includes('rotate(45 115 260)')) throw new Error('pemutus impor harus miring 45° (M8: CB 12×12 di bus 260)');
+  if (!s.includes('rotate(45 115 243)')) throw new Error('pemutus impor harus miring 45° (M16-B: CB 14×14 di atas bus, pusat 115,243)');
   if (count(s, 'TERBUKA') !== 1) throw new Error('1 label TERBUKA');
   if (s.includes('stroke-dasharray')) throw new Error('tetap tanpa dasharray');
 });
@@ -170,10 +171,11 @@ check('M9: kotak feeder TIDAK saling tumpuk — 5 kotak lebar 96 @ pitch 105 (ce
   }
   if (s.includes('width="110" height="52"')) throw new Error('kotak lebar 110 (tumpuk 5 px) harus dihapus (M9)');
 });
-check('M8: pemutus (CB) lebih besar — 12×12 (sebelumnya 8×8), tetap 6 buah', () => {
+check('M8+M16-B: pemutus (CB) lebih besar — kini 14×14 (M8: 12×12, semula 8×8), tetap 6 buah', () => {
   const s = renderAt(baseP, baseRun, 0);
   if (count(s, 'class="brk"') !== 6) throw new Error('tetap 6 pemutus (1 impor + 5 feeder)');
-  if (count(s, 'width="12" height="12"') !== 6) throw new Error('keenam CB harus 12×12, dapat ' + count(s, 'width="12" height="12"'));
+  if (count(s, 'width="14" height="14"') !== 6) throw new Error('keenam CB harus 14×14, dapat ' + count(s, 'width="14" height="14"'));
+  if (s.includes('width="12" height="12"')) throw new Error('CB 12×12 lama harus dihapus (M16-B)');
   if (s.includes('width="8" height="8"')) throw new Error('CB 8×8 lama harus dihapus (M8)');
 });
 check('M8: pita vertikal berurutan tanpa tumpuk — gen (≤192) < bus (260) < CB (268+) < kotak (400)', () => {
@@ -181,8 +183,47 @@ check('M8: pita vertikal berurutan tanpa tumpuk — gen (≤192) < bus (260) < C
   // chip generator pindah ke atas (band 148–192), bukan lagi 296–340
   if (s.includes('y="296"')) throw new Error('chip gen lama y=296 harus pindah ke atas (M8)');
   if (s.includes('y="364"')) throw new Error('label id gen lama y=364 harus pindah ke atas (M8)');
-  // CB feeder tepat di bawah bus: y=268 (12×12 → 268–280)
-  if (count(s, 'y="268"') !== 5) throw new Error('5 CB feeder harus tepat di bawah bus (y=268)');
+  // CB feeder 14×14 di bawah bus: y=270 (270–284, gap 6,5 dari tepi bus 263,5)
+  if (count(s, 'y="270"') !== 5) throw new Error('5 CB feeder harus di y=270 (menjauh dari bus, M16-B)');
+});
+
+/* ── M16-A: busbar di layer paling atas — tidak tertindih garis feeder/impor/vital ── */
+check('M16-B: CB feeder 14×14 MENJAUH dari bus — y=270 (gap 6,5 px dari tepi bawah bus 263,5), center di x feeder', () => {
+  const s = renderAt(baseP, baseRun, 0);
+  const cbs = [...s.matchAll(/<rect class="brk"[^>]*x="([0-9]+)" y="270" width="14" height="14"/g)].map(m => parseInt(m[1], 10));
+  if (cbs.length !== 5) throw new Error('5 CB feeder harus 14×14 @ y=270, dapat ' + cbs.length + ': ' + cbs);
+  const fx = [120, 225, 330, 435, 540];
+  fx.forEach((x, i) => { if (cbs[i] !== x - 7) throw new Error('CB ' + (i + 1) + ' harus center di x=' + x + ' (x-7), dapat x=' + cbs[i]); });
+  const gap = 270 - (260 + 3.5); // tepi bawah bus = 260 + stroke-width 7/2
+  if (gap < 6) throw new Error('gap CB→bus = ' + gap + ' px < 6');
+  if (s.includes('width="12" height="12"')) throw new Error('CB 12×12 lama harus dihapus (M16-B)');
+  if (count(s, 'y="268"') !== 0) throw new Error('CB yembek y=268 (menempel bus) harus hilang (M16-B)');
+});
+check('M16-B: CB impor 14×14 di ATAS bus dgn gap simetris — y=236 (bottom 250, gap 6,5 dari tepi atas bus 256,5)', () => {
+  const s = renderAt(baseP, baseRun, 0);
+  if (!s.includes('x="108" y="236" width="14" height="14"')) throw new Error('CB impor harus 14×14 @ y=236 (gap 6,5 di atas bus), dapat: ' + (s.match(/<rect class="brk"[^>]*x="10[0-9]"[^>]*>/) || [''])[0]);
+  if (!s.includes('<line class="imp" x1="115" y1="82" x2="115" y2="236"')) throw new Error('garis impor harus turun sampai tepi CB (y2=236, pola sentuh-simpul), dapat: ' + (s.match(/<line class="imp" x1="115"[^>]*>/) || [''])[0]);
+});
+check('M16-A: bus digambar TERAKHIR (elemen terakhir dalam string SVG) — tak tertindih hijau/biru/teal', () => {
+  const s = renderAt(baseP, baseRun, 0);
+  const busPos = s.indexOf('class="bus"');
+  if (busPos === -1) throw new Error('bus harus ada');
+  const impPos = s.indexOf('class="imp" x1="115"'); // garis impor (biru/ink, kiri)
+  const fedPos = s.indexOf('x1="120" y1="260" x2="120" y2="400"'); // feeder T1 (hijau)
+  const vitPos = s.indexOf('x1="540" y1="260" x2="540" y2="400"'); // feeder vital (teal)
+  if (busPos < impPos) throw new Error('bus (pos ' + busPos + ') harus setelah garis impor (pos ' + impPos + ')');
+  if (busPos < fedPos) throw new Error('bus (pos ' + busPos + ') harus setelah feeder T1 hijau (pos ' + fedPos + ')');
+  if (busPos < vitPos) throw new Error('bus (pos ' + busPos + ') harus setelah feeder vital teal (pos ' + vitPos + ')');
+});
+
+check('M16-C: label feeder lebih besar — id font 13, MW font 12 (sebelumnya 11/10,5)', () => {
+  const s = renderAt(baseP, baseRun, 0);
+  const idFs = [...s.matchAll(/<text x="(?:120|225|330|435|540)" y="(?:422|426)"[^>]*font-size="([0-9.]+)"/g)].map(m => parseFloat(m[1]));
+  const mwFs = [...s.matchAll(/<text x="(?:120|225|330|435|540)" y="(?:440|446)"[^>]*font-size="([0-9.]+)"/g)].map(m => parseFloat(m[1]));
+  if (idFs.length !== 5) throw new Error('5 label id feeder dibutuhkan, dapat ' + idFs.length);
+  if (mwFs.length !== 5) throw new Error('5 label MW feeder dibutuhkan, dapat ' + mwFs.length);
+  idFs.forEach(f => { if (f !== 13) throw new Error('font id feeder harus 13 (M16-C), dapat ' + f); });
+  mwFs.forEach(f => { if (f !== 12) throw new Error('font MW feeder harus 12 (M16-C), dapat ' + f); });
 });
 
 /* ── floor tipografi kanvas (plan-02 §4.4) ── */
@@ -278,11 +319,8 @@ check('F3: blok interkoneksi turun (y=48) — label id gen y=112, chip y=100, AG
   if (!sAgc.includes('y="84" width="32" height="15"')) throw new Error('AGC tag harus y=84 h=15 (teks muat penuh), dapat: ' + (sAgc.match(/<rect class="agctag"[^>]*>/) || [''])[0]);
   if (sAgc.includes('y="86" width="32" height="13"')) throw new Error('AGC tag 86×13 (teks meluber 0,7 px) harus dihapus (M12-A)');
 });
-check('M12-B: garis impor MENYENTUH CB (y2=254) — pola sentuh-simpul seragam', () => {
-  const s = renderAt(baseP, baseRun, 0);
-  if (!s.includes('<line class="imp" x1="115" y1="82" x2="115" y2="254"')) throw new Error('garis impor harus y2=254 (sentuh CB), dapat: ' + (s.match(/<line class="imp"[^>]*>/) || [''])[0]);
-  if (s.includes('y2="252"')) throw new Error('gap 2 px impor (y2=252) harus hilang (M12-B)');
-});
+/* M12-B (garis impor sentuh CB y2=254) digantikan M16-B: CB impor pindah ke ATAS bus,
+   garis kini berakhir di tepi atas CB (y2=236) — asersi serupa ada di cek M16-B. */
 check('M12-C: label Beban margin kanan konsisten — x=668 (sejajar tepi chip G3, margin 32 px)', () => {
   const s = renderAt(baseP, baseRun, 0);
   if (!s.includes('<text x="668" y="486" text-anchor="end"')) throw new Error('label Beban harus x=668 (margin kanan 32 px), dapat: ' + (s.match(/<text x="[0-9]+" y="486" text-anchor="end"[^>]*>/) || [''])[0]);

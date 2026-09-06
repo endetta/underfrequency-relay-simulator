@@ -43,7 +43,7 @@ langsung di browser atau `python -m http.server`.
   kini **disampling sampai ujung jendela TMAX** (f diam di fss / terpaku 47 saat
   RUNTUH; `dt` dijepit ke ujung jendela). SLD dirombak: **generator DI ATAS bus,
   beban DI BAWAH**; label feeder **dua baris** (id baris 1, MW baris 2 — tanpa
-  overlap); pemutus (CB) **12×12** (sebelumnya 8×8); spasi **transport ↔ kartu SLD**
+  overlap); pemutus  (CB) **12×12** (sebelumnya 8×8); spasi **transport ↔ kartu SLD**
   (`margin-top:10px`). Log: `design-plans/sesi-2026-09-05-04-…`.
 - **M9 (2026-09-05, audit overlap SLD)**: temuan scan bounding-box Chrome (5 skenario)
   — 5 kotak feeder 110 lebar @ pitch 105 **saling tumpuk 5 px** (sudut rx terpotong,
@@ -132,6 +132,12 @@ langsung di browser atau `python -m http.server`.
   CLAUDE kini memuat sesi-14/15, `svgBox()` (tak pernah ada di kode) dikoreksi jadi
   `plotSpace.sizeSvg`, hitungan skenario overview 6 → 8. Tes M15 baru di plot.test (**13
   asersi**). Total **167 asersi**. Log: `design-plans/sesi-2026-09-05-16-…`.
+- **M16 (2026-09-05, TDD user-request SLD)**: busbar digambar **terakhir** = layer
+  paling atas (tak tertindih feeder hijau/teal/impor); CB **14×14** menjauh dari bus
+  (feeder y=270, gap 6,5 px; impor **DI ATAS** bus y=236 dgn garis y2=236 & TERBUKA
+  y=230 — rotate(45 115 243)); label feeder **font 13/12** (dari 11/10,5). sld.test
+  31→**34** asersi (M16-A/B/C; literal M8/M12-B dilampirkan). Total **170 asersi**.
+  Log: `design-plans/sesi-2026-09-05-18-…`.
 
 ## Aturan umum workspace — SELF-CONTAINED (tidak perlu membaca CLAUDE.md/AGENTS.md di luar folder ini)
 
@@ -176,7 +182,8 @@ jangan diedit tanpa izin. Bila ragu proyek mana yang dimaksud user: tanyakan.
   (template `design-plans/sesi-TEMPLATE.md`): waktu mulai + commit sebelum → kegiatan
   & hasil (ringkas, dgn bukti tes/angka) → status → langkah berikutnya. Perbarui juga
   status header `design-plans/plan-*.md` yang dipakai (DRAF → DIEKSEKUSI → SELESAI).
-- Riwayat terbaru: `sesi-2026-09-05-17` (perbaikan white screen — SyntaxError `scenarioDelta`
+- Riwayat terbaru: `sesi-2026-09-05-18` (M16: bus layer atas + CB 14×14 + font feeder) →
+  `sesi-2026-09-05-17` (perbaikan white screen — SyntaxError `scenarioDelta`
   dari edit manual yang belum di-commit; file dikembalikan ke HEAD via stash, 8 suite + shoot
   hijau) → `sesi-2026-09-05-16` (M15: eksekusi temuan code-review) → `sesi-2026-09-05-15` (M14: teks grafik terpotong) → `sesi-2026-09-05-14` (M13: ciut-semua mepet ke atas) → `sesi-2026-09-05-13` (M12: audit lanjutan SLD) → `sesi-2026-09-05-12` (M11 F3: komposisi vertikal) → `sesi-2026-09-05-11` (M11 F2: spasi band generator) → `sesi-2026-09-05-10` (M11 F1: garis feeder tersambung) → `sesi-2026-09-05-09` (K3: plotSpace) → `sesi-2026-09-05-08` (K2: fasilitas run sim) → `sesi-2026-09-05-07` (refactor snapshot keadaan sesaat) → `sesi-2026-09-05-06` (M10: grafik mengisi kolom — renderer adaptif dims) → `sesi-2026-09-05-05` (M9: audit overlap SLD — kotak feeder tak lagi tumpuk) → `sesi-2026-09-05-04` (M8: bug play + rombak SLD) → `sesi-2026-09-05-03` (M7: temuan code-review) → `sesi-2026-09-05-02` (plan-03 M6: AGC + player real-time + jendela 30 s).
   Sebelumnya: `sesi-2026-09-05-01` (audit improve-ui → eksekusi M5, plan-02 SELESAI).

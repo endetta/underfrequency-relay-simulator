@@ -22,7 +22,8 @@ sepenuhnya berdiri sendiri (ADR-0001).
   lingkaran+salib (×) **di atas bus** dengan **chip RPM/MW live** (hijau online /
   copper "maks gov" saat jenuh / abu TRIP), 5 feeder beban (T1–T4 hijau + **beban
   vital teal**) tersambung solid **di bawah bus** sebagai kotak label dua-baris
-  **terpisah (tanpa tumpuk, M9)**; pemutus kotak **12×12** lurus (tertutup) vs
+  **terpisah (tanpa tumpuk, M9)**; pemutus kotak **14×14** menjauh dari bus (M16-B)
+  lurus (tertutup) vs
   **miring 45° + label TERBUKA** (terbuka); chip AGC saat kendali sekunder bekerja;
   legenda 5 item warna dibedakan. TIDAK ada garis putus-putus di jalur daya.
 - **Interpretasi satu sumber**: modul `snapshot(p, run, t)` menurunkan keadaan
@@ -73,7 +74,7 @@ Peristiwa yang dipicu t=1,0 s: Lepas G1/G2/G3 · Blok G3 · Lepas interkoneksi
 ```bash
 node tools/model.test.js     # 33 asersi literal (U01 §12 + hitung tangan)
 node tools/timeline.test.js  # 21 asersi (determinisme, parity, RUNTUH, jendela 0–30 s)
-node tools/sld.test.js       # 31 asersi geometri SLD (gen atas / beban bawah / CB 12×12 / kotak tak tumpuk / F1–F3 / M12)
+node tools/sld.test.js       # 34 asersi geometri SLD (gen atas / beban bawah / CB 14×14 / bus layer atas / kotak tak tumpuk / F1–F3 / M12 / M16)
 node tools/charts.test.js    # 21 asersi skala grafik/gauge/tegangan (incl. M10 adaptif, M14 label tak terpotong)
 node tools/ui.test.js        # 34 asersi seam desain & perilaku (incl. spasi transport↔SLD, M10 flex)
 node tools/snapshot.test.js  # 8 asersi snapshot keadaan sesaat (numerik lintas-permukaan)
@@ -82,7 +83,7 @@ node tools/plot.test.js      # 13 asersi ruang plot plotSpace (margin, kotak, si
 node tools/shoot.js          # screenshot 9 view → tools/shots/ (+ zoom ASCII SLD)
 ```
 
-Total **167 asersi**, semuanya hijau di Node ≥ 22 (tanpa dependensi). `tools/shoot.js`
+Total **170 asersi**, semuanya hijau di Node ≥ 22 (tanpa dependensi). `tools/shoot.js`
 mengikuti pola CDP tanpa-npm proyek Differential (Chrome otomatis / `CHROME=/path`).
 
 ## Sumber & keputusan

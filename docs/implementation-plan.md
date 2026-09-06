@@ -109,9 +109,11 @@ tunda habis; tahap yang trip **terkunci**; dasar fraksi = beban **pra-gangguan**
   chip RPM+MW samping (hijau online / copper maks-gov / abu trip); feeder T1–T4
   hijau + beban vital teal tersambung solid **di bawah bus**, label feeder **dua
   baris** (id / MW — M8, tanpa overlap); kotak feeder **96 lebar @ pitch 105** —
-  celah 9 px, tanpa saling tumpuk (M9); pemutus kotak **12×12** (M8, sebelumnya
-  8×8; lurus/miring 45°); spasi transport ↔ kartu SLD 10 px (M8); legenda 5 item
-  warna dibedakan.
+  celah 9 px, tanpa saling tumpuk (M9); pemutus kotak **14×14** menjauh dari bus
+  (M16-B: CB feeder y=270 gap 6,5 px, CB impor DI ATAS bus y=236; M8 12×12,
+  semula 8×8; lurus/miring 45°); busbar digambar terakhir = layer paling atas
+  (M16-A); label feeder font 13/12 (M16-C); spasi transport ↔ kartu SLD 10 px
+  (M8); legenda 5 item warna dibedakan.
 - **Transport kompak**: satu baris ramping; ▶/❚❚, spd 0,5×/1×/2×, scrubber 0–30 s,
   `t` live, Reset.
 - **Grafik frekuensi**: y 47–52 Hz (grid 0,5 Hz + pita normal ±0,2 hijau lembut +

@@ -989,8 +989,9 @@ function renderSld(p, t, run) {
   snap.trips.forEach(function (x) { open[x.stage] = x; });
   var out = [];
 
-  /* ── bus (y=260, plan-02 §4.3) — M8: generator DI ATAS, beban DI BAWAH ── */
-  out.push('<line class="bus" x1="70" y1="260" x2="590" y2="260" stroke="var(--ink)" stroke-width="7" stroke-linecap="round"/>');
+  /* ── bus (y=260, plan-02 §4.3) — M8: generator DI ATAS, beban DI BAWAH.
+     M16-A: garis bus dipindah ke AKHIR render (lihat sebelum return) agar berada
+     di layer paling atas — tak tertindih garis feeder hijau/teal/impor. ── */
 
   /* ── interkoneksi (kiri-atas) ── */
   var impMw = impLost ? 0 : p.importMw;
@@ -1000,10 +1001,10 @@ function renderSld(p, t, run) {
   out.push('<rect class="imp" x="60" y="48" width="110" height="34" rx="7" fill="' + impBg + '" stroke="' + impCol + '"/>'); // F3: blok impor turun → void impor→gen 90→38 px
   out.push('<text x="115" y="62" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" letter-spacing=".06em" fill="var(--ink-soft)">INTERKONEKSI</text>');
   out.push('<text x="115" y="76" text-anchor="middle" font-size="12" font-weight="600" font-family="JetBrains Mono,monospace" fill="' + impCol + '">' + impTxt + '</text>');
-  out.push('<line class="imp" x1="115" y1="82" x2="115" y2="254" stroke="var(--ink)" stroke-width="3"/>'); // M12-B: garis menyentuh tepi CB (pola sentuh-simpul seragam)
-  out.push('<rect class="brk" data-open="' + (impLost ? 1 : 0) + '" x="109" y="254" width="12" height="12" fill="' + (impLost ? 'var(--red-soft)' : 'var(--surface)') + '" stroke="' + (impLost ? 'var(--red)' : 'var(--ink)') + '" stroke-width="1.5"'
-    + (impLost ? ' transform="rotate(45 115 260)"' : '') + '/>');
-  if (impLost) out.push('<text class="openlab" x="115" y="246" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" fill="var(--red)" paint-order="stroke" stroke="var(--surface)" stroke-width="3">TERBUKA</text>');
+  out.push('<line class="imp" x1="115" y1="82" x2="115" y2="236" stroke="var(--ink)" stroke-width="3"/>'); // M16-B: garis turun ke tepi CB impor (pola sentuh-simpul; CB pindah ke atas bus)
+  out.push('<rect class="brk" data-open="' + (impLost ? 1 : 0) + '" x="108" y="236" width="14" height="14" fill="' + (impLost ? 'var(--red-soft)' : 'var(--surface)') + '" stroke="' + (impLost ? 'var(--red)' : 'var(--ink)') + '" stroke-width="1.5"'
+    + (impLost ? ' transform="rotate(45 115 243)"' : '') + '/>'); // M16-B: CB 14×14 di ATAS bus (236–250, gap 6,5 dari tepi bus 256,5)
+  if (impLost) out.push('<text class="openlab" x="115" y="230" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" fill="var(--red)" paint-order="stroke" stroke="var(--surface)" stroke-width="3">TERBUKA</text>'); // M16-B: label di atas CB
 
   /* ── generator (ATAS bus): lingkaran + salib (×) + chip SAMPING RPM/MW ── */
   var gx = [170, 350, 530];
@@ -1045,8 +1046,8 @@ function renderSld(p, t, run) {
     var bg  = fd.vital ? 'var(--teal-soft)' : 'var(--green-soft)';
     var idTxt = fd.vital ? 'VITAL' : fd.id;
     out.push('<line x1="' + x + '" y1="260" x2="' + x + '" y2="400" stroke="' + col + '" stroke-width="3"/>'); // F1: garis MENYENTUH tepi atas kotak (y=400) — gap 8 px dihapus
-    out.push('<rect class="brk" data-open="' + (isOpen ? 1 : 0) + '" x="' + (x - 6) + '" y="268" width="12" height="12" fill="' + (isOpen ? 'var(--red-soft)' : 'var(--surface)') + '" stroke="' + (isOpen ? 'var(--red)' : 'var(--ink)') + '" stroke-width="1.5"'
-      + (isOpen ? ' transform="rotate(45 ' + x + ' 274)"' : '') + '/>');
+    out.push('<rect class="brk" data-open="' + (isOpen ? 1 : 0) + '" x="' + (x - 7) + '" y="270" width="14" height="14" fill="' + (isOpen ? 'var(--red-soft)' : 'var(--surface)') + '" stroke="' + (isOpen ? 'var(--red)' : 'var(--ink)') + '" stroke-width="1.5"'
+      + (isOpen ? ' transform="rotate(45 ' + x + ' 277)"' : '') + '/>'); // M16-B: CB 14×14 @ y=270 — menjauh dari bus (gap 6,5 dari tepi 263,5)
     if (isOpen) out.push('<text class="openlab" x="' + x + '" y="298" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" fill="var(--red)" paint-order="stroke" stroke="var(--surface)" stroke-width="3">TERBUKA</text>');
     // panah aliran saat tertutup (arah bus → beban, ke bawah)
     if (!isOpen) {
@@ -1056,9 +1057,12 @@ function renderSld(p, t, run) {
     // M9: kotak 96 lebar @ pitch 105 → celah 9 antar kotak (sebelumnya 110 →
     // saling tumpuk 5 px & sudut membulat terpotong). Tepi strip 72–588 sejajar bus 70–590.
     out.push('<rect x="' + (x - 48) + '" y="400" width="96" height="52" rx="7" fill="' + bg + '" stroke="' + col + '"/>');
-    out.push('<text x="' + x + '" y="422" text-anchor="middle" font-size="11" font-family="JetBrains Mono,monospace" font-weight="600" fill="' + (fd.vital ? 'var(--teal)' : 'var(--green)') + '">' + idTxt + '</text>');
-    out.push('<text x="' + x + '" y="440" text-anchor="middle" font-size="10.5" font-family="JetBrains Mono,monospace" fill="' + (fd.vital ? 'var(--teal)' : 'var(--green)') + '">' + fd.mw + ' MW</text>');
+    out.push('<text x="' + x + '" y="426" text-anchor="middle" font-size="13" font-family="JetBrains Mono,monospace" font-weight="600" fill="' + (fd.vital ? 'var(--teal)' : 'var(--green)') + '">' + idTxt + '</text>'); // M16-C: font 11→13, y 422→426
+    out.push('<text x="' + x + '" y="446" text-anchor="middle" font-size="12" font-family="JetBrains Mono,monospace" fill="' + (fd.vital ? 'var(--teal)' : 'var(--green)') + '">' + fd.mw + ' MW</text>'); // M16-C: font 10,5→12, y 440→446
   });
+
+  /* M16-A: bus digambar TERAKHIR → layer paling atas (tidak ditindih garis lain). */
+  out.push('<line class="bus" x1="70" y1="260" x2="590" y2="260" stroke="var(--ink)" stroke-width="7" stroke-linecap="round"/>');
 
   /* ── ringkasan beban (di bawah kotak feeder, kanan) ── */
   out.push('<text x="668" y="486" text-anchor="end" font-size="11.5" font-family="JetBrains Mono,monospace" font-weight="600" fill="var(--ink-soft)">Beban '

@@ -22,7 +22,7 @@ Tidak ada instalasi, tidak ada build. Semua model & UI ada di satu file.
 - **SLD interaktif** — 3 generator (simbol lingkaran+salib, **di atas bus**, chip
   RPM/MW live: online / *maks gov* saat headroom habis / TRIP), 5 feeder beban
   (T1–T4 + beban vital teal, **di bawah bus**) sebagai kotak label dua-baris yang
-  tidak saling tumpuk, jalur interkoneksi yang bisa lepas, pemutus kotak 12×12
+  tidak saling tumpuk, jalur interkoneksi yang bisa lepas, pemutus kotak 14×14
   lurus vs miring 45° + label TERBUKA; chip AGC saat kendali sekunder bekerja.
 - **8 chip skenario** (peristiwa dipicu t=1,0 s, klik = auto-play): Seimbang ·
   Lepas G1 · Lepas G2 · Lepas G3 · Lepas interkoneksi · +Beban [MW] (slider) ·
@@ -58,7 +58,7 @@ node tools/plot.test.js      # ruang plot plotSpace (margin, kotak, sizeSvg)
 node tools/shoot.js          # screenshot semua view → tools/shots/
 ```
 
-167 asersi, hijau di Node ≥ 22 (tanpa dependensi) — model 33 · timeline 21 · sld 31 ·
+170 asersi, hijau di Node ≥ 22 (tanpa dependensi) — model 33 · timeline 21 · sld 34 ·
 charts 21 · ui 34 · snapshot 8 · sim 6 · plot 13. Detail: `docs/overview.md`,
 `docs/PRD.md` (model), `docs/implementation-plan.md` (kontrak).
 
